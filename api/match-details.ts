@@ -347,16 +347,6 @@ function extractTableData(html: string, tableClass: string): any[] {
   return results;
 }
 
-// Função para normalizar nome do time (remove acentos, espaços, etc.)
-function normalizeTeamName(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais
-    .trim();
-}
-
 // Função para encontrar nome do time no HTML (flexível)
 function findTeamNameInHTML(html: string, searchName: string): string | null {
   const normalized = normalizeTeamName(searchName);
