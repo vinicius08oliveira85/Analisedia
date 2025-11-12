@@ -1,5 +1,164 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { MatchDetails, Match, Standing, TeamStreaks, OpponentAnalysisMatch } from '../types';
+import type { MatchDetails, Match, Standing, TeamStreaks, OpponentAnalysisMatch, ScopedStats } from '../types';
+
+// Função auxiliar para criar streaks padrão
+function defaultStreaks(): TeamStreaks {
+  return {
+    winStreak: 0,
+    drawStreak: 0,
+    lossStreak: 0,
+    unbeatenStreak: 0,
+    winlessStreak: 0,
+    noDrawStreak: 0
+  };
+}
+
+// Extrai TODAS as tabelas de form (Últimos 10 jogos) pela estrutura
+function extractAllFormTables(html: string): Match[][] {
+  const results: Match[][] = [];
+  
+  // Busca todas as seções "Últimos 10 jogos" e extrai as tabelas em ordem
+  const sectionRegex = /Últimos 10 jogos[\s\S]*?<tr>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
+  
+  let match;
+  while ((match = sectionRegex.exec(html)) !== null) {
+    const tableHtml = match[2];
+    const matches = extractMatchesFromTable(tableHtml);
+    results.push(matches);
+  }
+  
+  return results;
+}
+
+// Extrai TODAS as tabelas de streaks pela estrutura
+function extractAllStreaksTables(html: string): ScopedStats<TeamStreaks>[] {
+  const results: ScopedStats<TeamStreaks>[] = [];
+  
+  // Busca todas as tabelas stat-seqs com seus subtitles na seção "Últimos 10 jogos"
+  const sectionRegex = /Últimos 10 jogos[\s\S]*?<tr[^>]*class="[^"]*ajax-container[^"]*"[^>]*>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
+  
+  let match;
+  while ((match = sectionRegex.exec(html)) !== null) {
+    const tableHtml = match[2];
+    const streaks = extractStreaksFromTable(tableHtml);
+    results.push(streaks);
+  }
+  
+  return results;
+}
+
+// Extrai streaks de uma tabela específica
+function extractStreaksFromTable(tableHtml: string): ScopedStats<TeamStreaks> {
+  const homeStreaks = defaultStreaks();
+  const awayStreaks = defaultStreaks();
+  const globalStreaks = defaultStreaks();
+  
+  // Remove o thead se existir
+  const tbodyMatch = tableHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+  const contentToParse = tbodyMatch ? tbodyMatch[1] : tableHtml;
+  
+  const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rows = contentToParse.match(rowRegex) || [];
+
+  for (const row of rows) {
+    if (row.includes('<thead') || row.includes('</thead>')) continue;
+    
+    const cells: string[] = [];
+    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(row)) !== null) {
+      let cellContent = cellMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      cells.push(cellContent);
+    }
+
+    if (cells.length >= 4) {
+      const label = (cells[0] || '').toLowerCase();
+      const homeValue = (cells[1] || '-').trim();
+      const awayValue = (cells[2] || '-').trim();
+      const globalValue = (cells[3] || '-').trim();
+      
+      const homeNum = homeValue === '-' || homeValue === '' ? 0 : parseInt(homeValue) || 0;
+      const awayNum = awayValue === '-' || awayValue === '' ? 0 : parseInt(awayValue) || 0;
+      const globalNum = globalValue === '-' || globalValue === '' ? 0 : parseInt(globalValue) || 0;
+      
+      if (label.includes('vitória') && label.includes('corrente')) {
+        homeStreaks.winStreak = homeNum;
+        awayStreaks.winStreak = awayNum;
+        globalStreaks.winStreak = globalNum;
+      } else if (label.includes('empate') && label.includes('corrente')) {
+        homeStreaks.drawStreak = homeNum;
+        awayStreaks.drawStreak = awayNum;
+        globalStreaks.drawStreak = globalNum;
+      } else if (label.includes('derrota') && label.includes('corrente')) {
+        homeStreaks.lossStreak = homeNum;
+        awayStreaks.lossStreak = awayNum;
+        globalStreaks.lossStreak = globalNum;
+      } else if (label.includes('não perde') || label.includes('sem perder')) {
+        homeStreaks.unbeatenStreak = homeNum;
+        awayStreaks.unbeatenStreak = awayNum;
+        globalStreaks.unbeatenStreak = globalNum;
+      } else if (label.includes('não ganha') || label.includes('sem vencer')) {
+        homeStreaks.winlessStreak = homeNum;
+        awayStreaks.winlessStreak = awayNum;
+        globalStreaks.winlessStreak = globalNum;
+      } else if (label.includes('não empata') || label.includes('sem empatar')) {
+        homeStreaks.noDrawStreak = homeNum;
+        awayStreaks.noDrawStreak = awayNum;
+        globalStreaks.noDrawStreak = globalNum;
+      }
+    }
+  }
+
+  return {
+    home: homeStreaks,
+    away: awayStreaks,
+    global: globalStreaks
+  };
+}
+
+// Extrai TODAS as tabelas de análise classificativa pela estrutura
+function extractAllAnalysisTables(html: string): ScopedStats<OpponentAnalysisMatch[]>[] {
+  const results: ScopedStats<OpponentAnalysisMatch[]>[] = [];
+  
+  // Busca seções de análise classificativa e "Todos os jogos na condição Casa/Fora"
+  const sectionRegex = /(?:Análise classificativa|Todos os jogos na condição Casa\/Fora)[\s\S]*?<tr>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
+  
+  let match;
+  const tablesByTeam: { [key: string]: string } = {};
+  
+  while ((match = sectionRegex.exec(html)) !== null) {
+    const teamName = match[1].trim();
+    const tableHtml = match[2];
+    
+    if (!tablesByTeam[teamName]) {
+      tablesByTeam[teamName] = tableHtml;
+    } else {
+      // Se já existe, concatena (pode ter múltiplas seções)
+      tablesByTeam[teamName] += '\n' + tableHtml;
+    }
+  }
+  
+  // Extrai análise para cada time encontrado
+  const teamNames = Object.keys(tablesByTeam);
+  for (const teamName of teamNames) {
+    const tableHtml = tablesByTeam[teamName];
+    const homeAnalysis = extractAnalysisFromTable(tableHtml, teamName, 'home');
+    const awayAnalysis = extractAnalysisFromTable(tableHtml, teamName, 'away');
+    const globalAnalysis = extractAnalysisFromTable(tableHtml, teamName);
+    
+    results.push({
+      home: homeAnalysis,
+      away: awayAnalysis,
+      global: globalAnalysis
+    });
+  }
+  
+  return results;
+}
 
 // Função para extrair dados de tabelas HTML
 function extractTableData(html: string, tableClass: string): any[] {
