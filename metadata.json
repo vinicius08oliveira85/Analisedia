@@ -1,0 +1,5 @@
+{
+  "name": "Análise de Jogo de Futebol",
+  "description": "Uma aplicação web que exibe estatísticas detalhadas de uma partida de futebol, incluindo confrontos diretos, forma recente das equipes, classificações da liga e análise de gols, com um resumo gerado por IA.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,145 @@
+import React, { useState } from 'react';
+import type { TeamGoalStats, TeamInfo, GoalScoringPatterns, CorrectScore, ScopedStats } from '../types';
+import { StatsCard } from './StatsCard';
+import { GoalMomentChart } from './GoalMomentChart';
+import { Card } from './Card';
+
+type Scope = 'Contextual' | 'Global';
+
+interface GoalAnalysisTabProps {
+    teamAGoalStats: ScopedStats<TeamGoalStats>;
+    teamBGoalStats: ScopedStats<TeamGoalStats>;
+    teamA: TeamInfo;
+    teamB: TeamInfo;
+    teamAGoalPatterns: ScopedStats<GoalScoringPatterns>;
+    teamBGoalPatterns: ScopedStats<GoalScoringPatterns>;
+    teamACorrectScores: ScopedStats<{ ht: CorrectScore[], ft: CorrectScore[] }>;
+    teamBCorrectScores: ScopedStats<{ ht: CorrectScore[], ft: CorrectScore[] }>;
+}
+
+const CorrectScoreDisplay: React.FC<{ htScores: CorrectScore[], ftScores: CorrectScore[], title: string }> = ({ htScores, ftScores, title }) => (
+    <Card title={title}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h5 className="text-sm font-semibold text-center text-gray-400 mb-2">Resultado ao Intervalo</h5>
+                <div className="space-y-2 text-sm">
+                    {htScores.map(cs => (
+                        <div key={cs.score} className="flex justify-between items-center bg-gray-600/50 p-2 rounded">
+                            <span className="font-mono font-bold text-white">{cs.score}</span>
+                            <span className="text-gray-300">{cs.count} {cs.count > 1 ? 'jogos' : 'jogo'}</span>
+                            <span className="font-semibold text-green-400">{cs.percentage}%</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+             <div>
+                <h5 className="text-sm font-semibold text-center text-gray-400 mb-2">Resultado Final</h5>
+                <div className="space-y-2 text-sm">
+                    {ftScores.map(cs => (
+                        <div key={cs.score} className="flex justify-between items-center bg-gray-600/50 p-2 rounded">
+                            <span className="font-mono font-bold text-white">{cs.score}</span>
+                            <span className="text-gray-300">{cs.count} {cs.count > 1 ? 'jogos' : 'jogo'}</span>
+                            <span className="font-semibold text-green-400">{cs.percentage}%</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    </Card>
+);
+
+const GoalScoringPatternsDisplay: React.FC<{ patterns: GoalScoringPatterns, title: string }> = ({ patterns, title }) => (
+     <Card title={title}>
+        <div className="text-sm space-y-3 text-gray-300">
+            <div className="flex justify-between items-center">
+                <span>Abre o placar:</span>
+                <span className="font-bold text-white">{patterns.opensScore.pct}% ({patterns.opensScore.games}/{patterns.opensScore.total} jogos)</span>
+            </div>
+            <div className="flex justify-between items-center">
+                <span>Vence ao abrir o placar:</span>
+                <span className="font-bold text-white">{patterns.winsWhenOpening.pct}% ({patterns.winsWhenOpening.games}/{patterns.winsWhenOpening.total} jogos)</span>
+            </div>
+            <div className="flex justify-between items-center">
+                <span>Reviravoltas (vitórias de virada):</span>
+                <span className="font-bold text-white">{patterns.comebacks.pct}% ({patterns.comebacks.games}/{patterns.comebacks.total} jogos)</span>
+            </div>
+        </div>
+    </Card>
+);
+
+
+const GoalStatsDisplay: React.FC<{ stats: TeamGoalStats, teamName: string }> = ({ stats, teamName }) => (
+    <div>
+        <h4 className="text-lg font-semibold mb-4 text-center text-white">{teamName}</h4>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <StatsCard label="Média Gols Marcados" value={stats.avgGoalsScored.toFixed(2)} />
+            <StatsCard label="Média Gols Sofridos" value={stats.avgGoalsConceded.toFixed(2)} />
+            <StatsCard label="Média Total Gols" value={stats.avgTotalGoals.toFixed(2)} />
+            <StatsCard label="> 2.5 Gols" value={`${stats.over25Pct}%`} />
+            <StatsCard label="< 2.5 Gols" value={`${stats.under25Pct}%`} />
+            <StatsCard label="Jogos s/ Marcar" value={`${stats.noGoalsScoredPct}%`} />
+        </div>
+        <GoalMomentChart 
+            scored={stats.goalMoments.scored} 
+            conceded={stats.goalMoments.conceded}
+        />
+    </div>
+);
+
+export const GoalAnalysisTab: React.FC<GoalAnalysisTabProps> = ({ teamAGoalStats, teamBGoalStats, teamA, teamB, teamAGoalPatterns, teamBGoalPatterns, teamACorrectScores, teamBCorrectScores }) => {
+    const [scope, setScope] = useState<Scope>('Contextual');
+    
+    const teamAStats = scope === 'Contextual' ? teamAGoalStats.home : teamAGoalStats.global;
+    const teamBStats = scope === 'Contextual' ? teamBGoalStats.away : teamBGoalStats.global;
+
+    const teamAPatterns = scope === 'Contextual' ? teamAGoalPatterns.home : teamAGoalPatterns.global;
+    const teamBPatterns = scope === 'Contextual' ? teamBGoalPatterns.away : teamBGoalPatterns.global;
+
+    const teamAScores = scope === 'Contextual' ? teamACorrectScores.home : teamACorrectScores.global;
+    const teamBScores = scope === 'Contextual' ? teamBCorrectScores.away : teamBCorrectScores.global;
+
+    const teamAContext = scope === 'Contextual' ? '(Casa)' : '(Global)';
+    const teamBContext = scope === 'Contextual' ? '(Fora)' : '(Global)';
+
+    const getButtonClass = (buttonScope: Scope) => {
+      const base = "w-1/2 px-4 py-2 text-sm font-semibold rounded-md focus:outline-none transition-all duration-300";
+      if (scope === buttonScope) {
+          return `${base} bg-green-500 text-white shadow-lg`;
+      }
+      return `${base} bg-transparent text-gray-300 hover:bg-gray-600`;
+    }
+
+    return (
+        <div className="space-y-8">
+            <div className="flex justify-center mb-4 rounded-lg p-1 bg-gray-900/50 border border-gray-700 w-full md:w-2/3 lg:w-1/2 mx-auto">
+                <button onClick={() => setScope('Contextual')} className={getButtonClass('Contextual')}>
+                    Como Mandante / Visitante
+                </button>
+                <button onClick={() => setScope('Global')} className={getButtonClass('Global')}>
+                    Global (Competição)
+                </button>
+            </div>
+            <div>
+                <h3 className="text-xl font-bold mb-6 text-green-400">Análise de Gols na Competição</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <GoalStatsDisplay stats={teamAStats} teamName={`${teamA.name} ${teamAContext}`} />
+                    <GoalStatsDisplay stats={teamBStats} teamName={`${teamB.name} ${teamBContext}`} />
+                </div>
+            </div>
+            <div>
+                <h3 className="text-xl font-bold mb-6 text-green-400">Padrões de Gols</h3>
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <GoalScoringPatternsDisplay patterns={teamAPatterns} title={`${teamA.name} ${teamAContext}`}/>
+                    <GoalScoringPatternsDisplay patterns={teamBPatterns} title={`${teamB.name} ${teamBContext}`}/>
+                 </div>
+            </div>
+             <div>
+                <h3 className="text-xl font-bold mb-6 text-green-400">Resultados Frequentes</h3>
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <CorrectScoreDisplay htScores={teamAScores.ht} ftScores={teamAScores.ft} title={`${teamA.name} ${teamAContext}`} />
+                    <CorrectScoreDisplay htScores={teamBScores.ht} ftScores={teamBScores.ft} title={`${teamB.name} ${teamBContext}`} />
+                 </div>
+            </div>
+        </div>
+    );
+};
