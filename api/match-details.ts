@@ -226,14 +226,27 @@ function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' |
   return streaks;
 }
 
-// Função para extrair análise classificativa (opponent analysis)
-function extractOpponentAnalysis(html: string, teamName: string): OpponentAnalysisMatch[] {
+// Função para extrair análise classificativa (opponent analysis) por contexto
+function extractOpponentAnalysis(html: string, teamName: string, context: 'home' | 'away' | 'global' = 'home'): OpponentAnalysisMatch[] {
   const analysis: OpponentAnalysisMatch[] = [];
 
   // Encontra o nome exato do time no HTML
   const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
   
-  // Procura pela seção "Análise classificativa"
+  // Para contexto global, procura na seção "Últimos 10 jogos"
+  if (context === 'global') {
+    const globalRegex = new RegExp(
+      `Últimos 10 jogos[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+      'i'
+    );
+    const globalMatch = html.match(globalRegex);
+    if (globalMatch) {
+      return extractAnalysisFromTable(globalMatch[1], actualTeamName);
+    }
+  }
+  
+  // Para contexto home/away, procura na seção "Análise classificativa"
+  const contextLabel = context === 'home' ? 'Casa' : 'Fora';
   const analysisRegex = new RegExp(
     `Análise classificativa[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
     'i'
@@ -241,8 +254,15 @@ function extractOpponentAnalysis(html: string, teamName: string): OpponentAnalys
 
   const match = html.match(analysisRegex);
   if (!match) return analysis;
+  
+  // Extrai apenas jogos do contexto específico (Casa ou Fora)
+  return extractAnalysisFromTable(match[1], actualTeamName, context);
+}
 
-  const tableHtml = match[1];
+// Função auxiliar para extrair análise de uma tabela
+function extractAnalysisFromTable(tableHtml: string, teamName: string, context?: 'home' | 'away'): OpponentAnalysisMatch[] {
+  const analysis: OpponentAnalysisMatch[] = [];
+
   const rowRegex = /<tr[^>]*class="[^"]*stat-quart-[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
   const rows = tableHtml.match(rowRegex) || [];
 
@@ -288,12 +308,17 @@ function extractOpponentAnalysis(html: string, teamName: string): OpponentAnalys
       const homeScore = parseInt(scoreMatch[1]) || 0;
       const awayScore = parseInt(scoreMatch[2]) || 0;
 
-      // Determina resultado baseado no time atual
-      let result: 'V' | 'E' | 'D' = 'E';
+      // Filtra por contexto se especificado
       const normalizedHomeTeam = normalizeTeamName(homeTeam);
       const normalizedAwayTeam = normalizeTeamName(awayTeam);
-      const normalizedTeamName = normalizeTeamName(actualTeamName);
+      const normalizedTeamName = normalizeTeamName(teamName);
       
+      // Se contexto especificado, filtra apenas jogos onde o time está no contexto correto
+      if (context === 'home' && normalizedHomeTeam !== normalizedTeamName) continue;
+      if (context === 'away' && normalizedAwayTeam !== normalizedTeamName) continue;
+
+      // Determina resultado baseado no time atual
+      let result: 'V' | 'E' | 'D' = 'E';
       if (normalizedHomeTeam === normalizedTeamName) {
         result = homeScore > awayScore ? 'V' : homeScore < awayScore ? 'D' : 'E';
       } else if (normalizedAwayTeam === normalizedTeamName) {
@@ -437,8 +462,13 @@ export default async function handler(
       const teamBStreaksAway = extractStreaks(html, matchInfo.teamB, 'away');
       const teamBStreaksGlobal = extractStreaks(html, matchInfo.teamB, 'global');
       
-      const teamAOpponentAnalysis = extractOpponentAnalysis(html, matchInfo.teamA);
-      const teamBOpponentAnalysis = extractOpponentAnalysis(html, matchInfo.teamB);
+      // Extrai análise classificativa para cada contexto
+      const teamAOpponentAnalysisHome = extractOpponentAnalysis(html, matchInfo.teamA, 'home');
+      const teamAOpponentAnalysisAway = extractOpponentAnalysis(html, matchInfo.teamA, 'away');
+      const teamAOpponentAnalysisGlobal = extractOpponentAnalysis(html, matchInfo.teamA, 'global');
+      const teamBOpponentAnalysisHome = extractOpponentAnalysis(html, matchInfo.teamB, 'home');
+      const teamBOpponentAnalysisAway = extractOpponentAnalysis(html, matchInfo.teamB, 'away');
+      const teamBOpponentAnalysisGlobal = extractOpponentAnalysis(html, matchInfo.teamB, 'global');
 
       // Logs de debug
       console.log('Extração de dados:', {
@@ -449,8 +479,12 @@ export default async function handler(
         h2hCount: h2hData.length,
         teamAStreaksHome,
         teamBStreaksAway,
-        teamAAnalysisCount: teamAOpponentAnalysis.length,
-        teamBAnalysisCount: teamBOpponentAnalysis.length
+        teamAAnalysisHomeCount: teamAOpponentAnalysisHome.length,
+        teamAAnalysisAwayCount: teamAOpponentAnalysisAway.length,
+        teamAAnalysisGlobalCount: teamAOpponentAnalysisGlobal.length,
+        teamBAnalysisHomeCount: teamBOpponentAnalysisHome.length,
+        teamBAnalysisAwayCount: teamBOpponentAnalysisAway.length,
+        teamBAnalysisGlobalCount: teamBOpponentAnalysisGlobal.length
       });
 
       // Retorna os dados extraídos
@@ -472,14 +506,14 @@ export default async function handler(
             global: teamBStreaksGlobal
           },
           teamAOpponentAnalysis: {
-            home: teamAOpponentAnalysis,
-            away: [],
-            global: teamAOpponentAnalysis
+            home: teamAOpponentAnalysisHome,
+            away: teamAOpponentAnalysisAway,
+            global: teamAOpponentAnalysisGlobal
           },
           teamBOpponentAnalysis: {
-            home: [],
-            away: teamBOpponentAnalysis,
-            global: teamBOpponentAnalysis
+            home: teamBOpponentAnalysisHome,
+            away: teamBOpponentAnalysisAway,
+            global: teamBOpponentAnalysisGlobal
           }
         },
         message: 'Detalhes da partida processados com sucesso',
@@ -487,8 +521,12 @@ export default async function handler(
           teamAFormCount: teamAForm.length,
           teamBFormCount: teamBForm.length,
           h2hCount: h2hData.length,
-          teamAAnalysisCount: teamAOpponentAnalysis.length,
-          teamBAnalysisCount: teamBOpponentAnalysis.length
+          teamAAnalysisHomeCount: teamAOpponentAnalysisHome.length,
+          teamAAnalysisAwayCount: teamAOpponentAnalysisAway.length,
+          teamAAnalysisGlobalCount: teamAOpponentAnalysisGlobal.length,
+          teamBAnalysisHomeCount: teamBOpponentAnalysisHome.length,
+          teamBAnalysisAwayCount: teamBOpponentAnalysisAway.length,
+          teamBAnalysisGlobalCount: teamBOpponentAnalysisGlobal.length
         }
       });
     } catch (error) {
