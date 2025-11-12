@@ -15,12 +15,51 @@ function defaultStreaks(): TeamStreaks {
 
 // Função para normalizar nome do time (remove acentos, espaços, etc.)
 function normalizeTeamName(name: string): string {
-  return name
+  let normalized = name
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-    .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais
     .trim();
+  
+  // Mapeia variações comuns de nomes de times brasileiros
+  const variations: { [key: string]: string } = {
+    'atletico-mg': 'atleticomineiro',
+    'atletico mg': 'atleticomineiro',
+    'atletico mineiro': 'atleticomineiro',
+    'atletico mg': 'atleticomineiro',
+    'atletico': 'atleticomineiro',
+    'flamengo': 'flamengo',
+    'fluminense': 'fluminense',
+    'corinthians': 'corinthians',
+    'palmeiras': 'palmeiras',
+    'sao paulo': 'saopaulo',
+    'santos': 'santos',
+    'gremio': 'gremio',
+    'internacional': 'internacional',
+    'cruzeiro': 'cruzeiro',
+    'botafogo': 'botafogo',
+    'vasco': 'vascodagama',
+    'vascodagama': 'vascodagama',
+    'fortaleza': 'fortaleza',
+    'athletico': 'athleticoparanaense',
+    'athletico paranaense': 'athleticoparanaense',
+    'athletico-pr': 'athleticoparanaense',
+    'athletico pr': 'athleticoparanaense',
+  };
+  
+  // Remove caracteres especiais para comparação
+  const cleaned = normalized.replace(/[^a-z0-9]/g, '');
+  
+  // Verifica se há uma variação conhecida
+  for (const [key, value] of Object.entries(variations)) {
+    const keyCleaned = key.replace(/[^a-z0-9]/g, '');
+    if (cleaned.includes(keyCleaned) || keyCleaned.includes(cleaned)) {
+      return value;
+    }
+  }
+  
+  // Se não encontrou variação, retorna limpo
+  return cleaned;
 }
 
 // Função auxiliar para extrair jogos de uma tabela
@@ -117,16 +156,21 @@ function extractAllFormTablesWithNames(html: string): Array<{ teamName: string; 
 // Função auxiliar para encontrar tabela de form para um time específico
 function findTableForTeam(tables: Array<{ teamName: string; matches: Match[] }>, searchTeam: string): Match[] | null {
   const searchNormalized = normalizeTeamName(searchTeam);
+  console.log(`  Procurando tabela para: "${searchTeam}" (normalizado: "${searchNormalized}")`);
   
   for (const table of tables) {
     const foundNormalized = normalizeTeamName(table.teamName);
+    console.log(`    Comparando com: "${table.teamName}" (normalizado: "${foundNormalized}")`);
+    
     if (foundNormalized === searchNormalized || 
         foundNormalized.includes(searchNormalized) || 
         searchNormalized.includes(foundNormalized)) {
+      console.log(`    ✓ Match encontrado!`);
       return table.matches;
     }
   }
   
+  console.log(`    ✗ Nenhum match encontrado`);
   return null;
 }
 
