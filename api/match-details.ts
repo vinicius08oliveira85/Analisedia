@@ -217,7 +217,7 @@ function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' |
   
   if (!match || !match[match.length - 1]) return defaultStreaks;
 
-  const tableHtml = match[1];
+  const tableHtml = match[match.length - 1];
   
   // Remove o thead se existir
   const tbodyMatch = tableHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
