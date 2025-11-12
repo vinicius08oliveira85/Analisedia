@@ -834,28 +834,40 @@ export default async function handler(
       // Identifica qual tabela pertence a qual time pelo nome encontrado no HTML
       
       // 1. Extrai todas as tabelas de "Últimos 10 jogos" (Form) e identifica qual é de qual time
+      console.log('=== Extraindo Form ===');
       const allFormTables = extractAllFormTablesWithNames(html);
+      console.log(`Tabelas de form encontradas: ${allFormTables.length}`);
+      allFormTables.forEach((t, i) => console.log(`  ${i + 1}. ${t.teamName}: ${t.matches.length} jogos`));
+      
       const teamAForm = findTableForTeam(allFormTables, matchInfo.teamA) || [];
       const teamBForm = findTableForTeam(allFormTables, matchInfo.teamB) || [];
-      console.log(`Form extraído: Time A (${matchInfo.teamA}) = ${teamAForm.length}, Time B (${matchInfo.teamB}) = ${teamBForm.length}`);
+      console.log(`Form final: Time A (${matchInfo.teamA}) = ${teamAForm.length}, Time B (${matchInfo.teamB}) = ${teamBForm.length}`);
       
       // 2. Extrai todas as tabelas de streaks e identifica qual é de qual time
+      console.log('=== Extraindo Streaks ===');
       const allStreaksTables = extractAllStreaksTablesWithNames(html);
+      console.log(`Tabelas de streaks encontradas: ${allStreaksTables.length}`);
+      allStreaksTables.forEach((t, i) => console.log(`  ${i + 1}. ${t.teamName}`));
+      
       const teamAStreaks = findStreaksForTeam(allStreaksTables, matchInfo.teamA) || { home: defaultStreaks(), away: defaultStreaks(), global: defaultStreaks() };
       const teamBStreaks = findStreaksForTeam(allStreaksTables, matchInfo.teamB) || { home: defaultStreaks(), away: defaultStreaks(), global: defaultStreaks() };
-      console.log(`Streaks extraídos: Time A =`, teamAStreaks);
-      console.log(`Streaks extraídos: Time B =`, teamBStreaks);
+      console.log(`Streaks final: Time A =`, teamAStreaks);
+      console.log(`Streaks final: Time B =`, teamBStreaks);
       
       // 3. Extrai todas as tabelas de análise classificativa e identifica qual é de qual time
+      console.log('=== Extraindo Análise ===');
       const allAnalysisTables = extractAllAnalysisTablesWithNames(html);
+      console.log(`Tabelas de análise encontradas: ${allAnalysisTables.length}`);
+      allAnalysisTables.forEach((t, i) => console.log(`  ${i + 1}. ${t.teamName}: home=${t.analysis.home.length}, away=${t.analysis.away.length}, global=${t.analysis.global.length}`));
+      
       const teamAOpponentAnalysis = findAnalysisForTeam(allAnalysisTables, matchInfo.teamA) || { home: [], away: [], global: [] };
       const teamBOpponentAnalysis = findAnalysisForTeam(allAnalysisTables, matchInfo.teamB) || { home: [], away: [], global: [] };
-      console.log(`Análise extraída: Time A =`, {
+      console.log(`Análise final: Time A =`, {
         home: teamAOpponentAnalysis.home.length,
         away: teamAOpponentAnalysis.away.length,
         global: teamAOpponentAnalysis.global.length
       });
-      console.log(`Análise extraída: Time B =`, {
+      console.log(`Análise final: Time B =`, {
         home: teamBOpponentAnalysis.home.length,
         away: teamBOpponentAnalysis.away.length,
         global: teamBOpponentAnalysis.global.length
