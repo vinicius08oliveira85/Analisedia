@@ -245,14 +245,23 @@ function extractOpponentAnalysis(html: string, teamName: string, context: 'home'
     }
   }
   
-  // Para contexto home/away, procura na seção "Análise classificativa"
-  const contextLabel = context === 'home' ? 'Casa' : 'Fora';
+  // Para contexto home/away, procura primeiro na seção "Análise classificativa"
   const analysisRegex = new RegExp(
     `Análise classificativa[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
     'i'
   );
 
-  const match = html.match(analysisRegex);
+  let match = html.match(analysisRegex);
+  
+  // Se não encontrar na análise classificativa, tenta na seção "Todos os jogos na condição Casa/Fora"
+  if (!match) {
+    const allMatchesRegex = new RegExp(
+      `Todos os jogos na condição Casa/Fora[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+      'i'
+    );
+    match = html.match(allMatchesRegex);
+  }
+  
   if (!match) return analysis;
   
   // Extrai apenas jogos do contexto específico (Casa ou Fora)
