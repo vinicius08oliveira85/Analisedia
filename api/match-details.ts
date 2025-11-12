@@ -13,6 +13,16 @@ function defaultStreaks(): TeamStreaks {
   };
 }
 
+// Função para normalizar nome do time (remove acentos, espaços, etc.)
+function normalizeTeamName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais
+    .trim();
+}
+
 // Função auxiliar para extrair jogos de uma tabela
 function extractMatchesFromTable(tableHtml: string): Match[] {
   const matches: Match[] = [];
