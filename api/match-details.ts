@@ -578,74 +578,40 @@ export default async function handler(
 
       console.log('Match Info extraído:', matchInfo);
 
-      // Extrai dados detalhados - com logs detalhados
-      console.log('=== Extraindo Form do Time A ===');
-      const teamAForm = extractLast10Matches(html, matchInfo.teamA);
-      console.log(`Time A (${matchInfo.teamA}): ${teamAForm.length} jogos extraídos`);
+      // NOVA ABORDAGEM: Extrai todas as informações diretamente do HTML pela estrutura
+      // Sem depender do nome do time, apenas pela posição/estrutura
       
-      console.log('=== Extraindo Form do Time B ===');
-      const teamBForm = extractLast10Matches(html, matchInfo.teamB);
-      console.log(`Time B (${matchInfo.teamB}): ${teamBForm.length} jogos extraídos`);
+      // 1. Extrai todas as tabelas de "Últimos 10 jogos" (Form)
+      const allFormTables = extractAllFormTables(html);
+      const teamAForm = allFormTables[0] || [];
+      const teamBForm = allFormTables[1] || [];
+      console.log(`Form extraído: Time A = ${teamAForm.length}, Time B = ${teamBForm.length}`);
       
-      console.log('=== Extraindo H2H ===');
+      // 2. Extrai todas as tabelas de streaks
+      const allStreaksTables = extractAllStreaksTables(html);
+      const teamAStreaks = allStreaksTables[0] || { home: defaultStreaks(), away: defaultStreaks(), global: defaultStreaks() };
+      const teamBStreaks = allStreaksTables[1] || { home: defaultStreaks(), away: defaultStreaks(), global: defaultStreaks() };
+      console.log(`Streaks extraídos: Time A =`, teamAStreaks);
+      console.log(`Streaks extraídos: Time B =`, teamBStreaks);
+      
+      // 3. Extrai todas as tabelas de análise classificativa
+      const allAnalysisTables = extractAllAnalysisTables(html);
+      const teamAOpponentAnalysis = allAnalysisTables[0] || { home: [], away: [], global: [] };
+      const teamBOpponentAnalysis = allAnalysisTables[1] || { home: [], away: [], global: [] };
+      console.log(`Análise extraída: Time A =`, {
+        home: teamAOpponentAnalysis.home.length,
+        away: teamAOpponentAnalysis.away.length,
+        global: teamAOpponentAnalysis.global.length
+      });
+      console.log(`Análise extraída: Time B =`, {
+        home: teamBOpponentAnalysis.home.length,
+        away: teamBOpponentAnalysis.away.length,
+        global: teamBOpponentAnalysis.global.length
+      });
+      
+      // 4. Extrai H2H
       const h2hData = extractH2HMatches(html);
       console.log(`H2H: ${h2hData.length} jogos extraídos`);
-      
-      // Extrai streaks para cada escopo
-      console.log('=== Extraindo Streaks do Time A ===');
-      const teamAStreaksHome = extractStreaks(html, matchInfo.teamA, 'home');
-      console.log(`Time A Streaks Home:`, teamAStreaksHome);
-      const teamAStreaksAway = extractStreaks(html, matchInfo.teamA, 'away');
-      console.log(`Time A Streaks Away:`, teamAStreaksAway);
-      const teamAStreaksGlobal = extractStreaks(html, matchInfo.teamA, 'global');
-      console.log(`Time A Streaks Global:`, teamAStreaksGlobal);
-      
-      console.log('=== Extraindo Streaks do Time B ===');
-      const teamBStreaksHome = extractStreaks(html, matchInfo.teamB, 'home');
-      console.log(`Time B Streaks Home:`, teamBStreaksHome);
-      const teamBStreaksAway = extractStreaks(html, matchInfo.teamB, 'away');
-      console.log(`Time B Streaks Away:`, teamBStreaksAway);
-      const teamBStreaksGlobal = extractStreaks(html, matchInfo.teamB, 'global');
-      console.log(`Time B Streaks Global:`, teamBStreaksGlobal);
-      
-      // Extrai análise classificativa para cada contexto
-      console.log('=== Extraindo Análise do Time A ===');
-      const teamAOpponentAnalysisHome = extractOpponentAnalysis(html, matchInfo.teamA, 'home');
-      console.log(`Time A Analysis Home: ${teamAOpponentAnalysisHome.length} jogos`);
-      const teamAOpponentAnalysisAway = extractOpponentAnalysis(html, matchInfo.teamA, 'away');
-      console.log(`Time A Analysis Away: ${teamAOpponentAnalysisAway.length} jogos`);
-      const teamAOpponentAnalysisGlobal = extractOpponentAnalysis(html, matchInfo.teamA, 'global');
-      console.log(`Time A Analysis Global: ${teamAOpponentAnalysisGlobal.length} jogos`);
-      
-      console.log('=== Extraindo Análise do Time B ===');
-      const teamBOpponentAnalysisHome = extractOpponentAnalysis(html, matchInfo.teamB, 'home');
-      console.log(`Time B Analysis Home: ${teamBOpponentAnalysisHome.length} jogos`);
-      const teamBOpponentAnalysisAway = extractOpponentAnalysis(html, matchInfo.teamB, 'away');
-      console.log(`Time B Analysis Away: ${teamBOpponentAnalysisAway.length} jogos`);
-      const teamBOpponentAnalysisGlobal = extractOpponentAnalysis(html, matchInfo.teamB, 'global');
-      console.log(`Time B Analysis Global: ${teamBOpponentAnalysisGlobal.length} jogos`);
-
-      // Logs de debug resumidos
-      console.log('=== RESUMO DA EXTRAÇÃO ===');
-      console.log({
-        teamA: matchInfo.teamA,
-        teamB: matchInfo.teamB,
-        teamAFormCount: teamAForm.length,
-        teamBFormCount: teamBForm.length,
-        h2hCount: h2hData.length,
-        teamAStreaksHome,
-        teamAStreaksAway,
-        teamAStreaksGlobal,
-        teamBStreaksHome,
-        teamBStreaksAway,
-        teamBStreaksGlobal,
-        teamAAnalysisHomeCount: teamAOpponentAnalysisHome.length,
-        teamAAnalysisAwayCount: teamAOpponentAnalysisAway.length,
-        teamAAnalysisGlobalCount: teamAOpponentAnalysisGlobal.length,
-        teamBAnalysisHomeCount: teamBOpponentAnalysisHome.length,
-        teamBAnalysisAwayCount: teamBOpponentAnalysisAway.length,
-        teamBAnalysisGlobalCount: teamBOpponentAnalysisGlobal.length
-      });
 
       // Retorna os dados extraídos
       return res.status(200).json({
@@ -655,38 +621,22 @@ export default async function handler(
           teamAForm,
           teamBForm,
           h2hData,
-          teamAStreaks: {
-            home: teamAStreaksHome,
-            away: teamAStreaksAway,
-            global: teamAStreaksGlobal
-          },
-          teamBStreaks: {
-            home: teamBStreaksHome,
-            away: teamBStreaksAway,
-            global: teamBStreaksGlobal
-          },
-          teamAOpponentAnalysis: {
-            home: teamAOpponentAnalysisHome,
-            away: teamAOpponentAnalysisAway,
-            global: teamAOpponentAnalysisGlobal
-          },
-          teamBOpponentAnalysis: {
-            home: teamBOpponentAnalysisHome,
-            away: teamBOpponentAnalysisAway,
-            global: teamBOpponentAnalysisGlobal
-          }
+          teamAStreaks,
+          teamBStreaks,
+          teamAOpponentAnalysis,
+          teamBOpponentAnalysis
         },
         message: 'Detalhes da partida processados com sucesso',
         debug: {
           teamAFormCount: teamAForm.length,
           teamBFormCount: teamBForm.length,
           h2hCount: h2hData.length,
-          teamAAnalysisHomeCount: teamAOpponentAnalysisHome.length,
-          teamAAnalysisAwayCount: teamAOpponentAnalysisAway.length,
-          teamAAnalysisGlobalCount: teamAOpponentAnalysisGlobal.length,
-          teamBAnalysisHomeCount: teamBOpponentAnalysisHome.length,
-          teamBAnalysisAwayCount: teamBOpponentAnalysisAway.length,
-          teamBAnalysisGlobalCount: teamBOpponentAnalysisGlobal.length
+          teamAAnalysisHomeCount: teamAOpponentAnalysis.home.length,
+          teamAAnalysisAwayCount: teamAOpponentAnalysis.away.length,
+          teamAAnalysisGlobalCount: teamAOpponentAnalysis.global.length,
+          teamBAnalysisHomeCount: teamBOpponentAnalysis.home.length,
+          teamBAnalysisAwayCount: teamBOpponentAnalysis.away.length,
+          teamBAnalysisGlobalCount: teamBOpponentAnalysis.global.length
         }
       });
     } catch (error) {
