@@ -87,38 +87,72 @@ function extractMatchesFromTable(tableHtml: string): Match[] {
   return matches;
 }
 
-// Extrai TODAS as tabelas de form (Últimos 10 jogos) pela estrutura
-function extractAllFormTables(html: string): Match[][] {
-  const results: Match[][] = [];
+// Extrai TODAS as tabelas de form (Últimos 10 jogos) pela estrutura com nomes
+function extractAllFormTablesWithNames(html: string): Array<{ teamName: string; matches: Match[] }> {
+  const results: Array<{ teamName: string; matches: Match[] }> = [];
   
-  // Busca todas as seções "Últimos 10 jogos" e extrai as tabelas em ordem
+  // Busca todas as seções "Últimos 10 jogos" e extrai as tabelas com seus nomes
   const sectionRegex = /Últimos 10 jogos[\s\S]*?<tr>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
   
   let match;
   while ((match = sectionRegex.exec(html)) !== null) {
+    const teamName = match[1].trim();
     const tableHtml = match[2];
     const matches = extractMatchesFromTable(tableHtml);
-    results.push(matches);
+    results.push({ teamName, matches });
   }
   
   return results;
 }
 
-// Extrai TODAS as tabelas de streaks pela estrutura
-function extractAllStreaksTables(html: string): ScopedStats<TeamStreaks>[] {
-  const results: ScopedStats<TeamStreaks>[] = [];
+// Função auxiliar para encontrar tabela de form para um time específico
+function findTableForTeam(tables: Array<{ teamName: string; matches: Match[] }>, searchTeam: string): Match[] | null {
+  const searchNormalized = normalizeTeamName(searchTeam);
+  
+  for (const table of tables) {
+    const foundNormalized = normalizeTeamName(table.teamName);
+    if (foundNormalized === searchNormalized || 
+        foundNormalized.includes(searchNormalized) || 
+        searchNormalized.includes(foundNormalized)) {
+      return table.matches;
+    }
+  }
+  
+  return null;
+}
+
+// Extrai TODAS as tabelas de streaks pela estrutura com nomes
+function extractAllStreaksTablesWithNames(html: string): Array<{ teamName: string; streaks: ScopedStats<TeamStreaks> }> {
+  const results: Array<{ teamName: string; streaks: ScopedStats<TeamStreaks> }> = [];
   
   // Busca todas as tabelas stat-seqs com seus subtitles na seção "Últimos 10 jogos"
   const sectionRegex = /Últimos 10 jogos[\s\S]*?<tr[^>]*class="[^"]*ajax-container[^"]*"[^>]*>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
   
   let match;
   while ((match = sectionRegex.exec(html)) !== null) {
+    const teamName = match[1].trim();
     const tableHtml = match[2];
     const streaks = extractStreaksFromTable(tableHtml);
-    results.push(streaks);
+    results.push({ teamName, streaks });
   }
   
   return results;
+}
+
+// Função auxiliar para encontrar streaks para um time específico
+function findStreaksForTeam(tables: Array<{ teamName: string; streaks: ScopedStats<TeamStreaks> }>, searchTeam: string): ScopedStats<TeamStreaks> | null {
+  const searchNormalized = normalizeTeamName(searchTeam);
+  
+  for (const table of tables) {
+    const foundNormalized = normalizeTeamName(table.teamName);
+    if (foundNormalized === searchNormalized || 
+        foundNormalized.includes(searchNormalized) || 
+        searchNormalized.includes(foundNormalized)) {
+      return table.streaks;
+    }
+  }
+  
+  return null;
 }
 
 // Extrai streaks de uma tabela específica
@@ -275,9 +309,9 @@ function extractAnalysisFromTable(tableHtml: string, teamName: string, context?:
   return analysis;
 }
 
-// Extrai TODAS as tabelas de análise classificativa pela estrutura
-function extractAllAnalysisTables(html: string): ScopedStats<OpponentAnalysisMatch[]>[] {
-  const results: ScopedStats<OpponentAnalysisMatch[]>[] = [];
+// Extrai TODAS as tabelas de análise classificativa pela estrutura com nomes
+function extractAllAnalysisTablesWithNames(html: string): Array<{ teamName: string; analysis: ScopedStats<OpponentAnalysisMatch[]> }> {
+  const results: Array<{ teamName: string; analysis: ScopedStats<OpponentAnalysisMatch[]> }> = [];
   
   // Busca seções de análise classificativa e "Todos os jogos na condição Casa/Fora"
   const sectionRegex = /(?:Análise classificativa|Todos os jogos na condição Casa\/Fora)[\s\S]*?<tr>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
@@ -306,13 +340,32 @@ function extractAllAnalysisTables(html: string): ScopedStats<OpponentAnalysisMat
     const globalAnalysis = extractAnalysisFromTable(tableHtml, teamName);
     
     results.push({
-      home: homeAnalysis,
-      away: awayAnalysis,
-      global: globalAnalysis
+      teamName,
+      analysis: {
+        home: homeAnalysis,
+        away: awayAnalysis,
+        global: globalAnalysis
+      }
     });
   }
   
   return results;
+}
+
+// Função auxiliar para encontrar análise para um time específico
+function findAnalysisForTeam(tables: Array<{ teamName: string; analysis: ScopedStats<OpponentAnalysisMatch[]> }>, searchTeam: string): ScopedStats<OpponentAnalysisMatch[]> | null {
+  const searchNormalized = normalizeTeamName(searchTeam);
+  
+  for (const table of tables) {
+    const foundNormalized = normalizeTeamName(table.teamName);
+    if (foundNormalized === searchNormalized || 
+        foundNormalized.includes(searchNormalized) || 
+        searchNormalized.includes(foundNormalized)) {
+      return table.analysis;
+    }
+  }
+  
+  return null;
 }
 
 // Função para extrair dados de tabelas HTML
@@ -738,25 +791,25 @@ export default async function handler(
       console.log('Match Info extraído:', matchInfo);
 
       // NOVA ABORDAGEM: Extrai todas as informações diretamente do HTML pela estrutura
-      // Sem depender do nome do time, apenas pela posição/estrutura
+      // Identifica qual tabela pertence a qual time pelo nome encontrado no HTML
       
-      // 1. Extrai todas as tabelas de "Últimos 10 jogos" (Form)
-      const allFormTables = extractAllFormTables(html);
-      const teamAForm = allFormTables[0] || [];
-      const teamBForm = allFormTables[1] || [];
-      console.log(`Form extraído: Time A = ${teamAForm.length}, Time B = ${teamBForm.length}`);
+      // 1. Extrai todas as tabelas de "Últimos 10 jogos" (Form) e identifica qual é de qual time
+      const allFormTables = extractAllFormTablesWithNames(html);
+      const teamAForm = findTableForTeam(allFormTables, matchInfo.teamA) || [];
+      const teamBForm = findTableForTeam(allFormTables, matchInfo.teamB) || [];
+      console.log(`Form extraído: Time A (${matchInfo.teamA}) = ${teamAForm.length}, Time B (${matchInfo.teamB}) = ${teamBForm.length}`);
       
-      // 2. Extrai todas as tabelas de streaks
-      const allStreaksTables = extractAllStreaksTables(html);
-      const teamAStreaks = allStreaksTables[0] || { home: defaultStreaks(), away: defaultStreaks(), global: defaultStreaks() };
-      const teamBStreaks = allStreaksTables[1] || { home: defaultStreaks(), away: defaultStreaks(), global: defaultStreaks() };
+      // 2. Extrai todas as tabelas de streaks e identifica qual é de qual time
+      const allStreaksTables = extractAllStreaksTablesWithNames(html);
+      const teamAStreaks = findStreaksForTeam(allStreaksTables, matchInfo.teamA) || { home: defaultStreaks(), away: defaultStreaks(), global: defaultStreaks() };
+      const teamBStreaks = findStreaksForTeam(allStreaksTables, matchInfo.teamB) || { home: defaultStreaks(), away: defaultStreaks(), global: defaultStreaks() };
       console.log(`Streaks extraídos: Time A =`, teamAStreaks);
       console.log(`Streaks extraídos: Time B =`, teamBStreaks);
       
-      // 3. Extrai todas as tabelas de análise classificativa
-      const allAnalysisTables = extractAllAnalysisTables(html);
-      const teamAOpponentAnalysis = allAnalysisTables[0] || { home: [], away: [], global: [] };
-      const teamBOpponentAnalysis = allAnalysisTables[1] || { home: [], away: [], global: [] };
+      // 3. Extrai todas as tabelas de análise classificativa e identifica qual é de qual time
+      const allAnalysisTables = extractAllAnalysisTablesWithNames(html);
+      const teamAOpponentAnalysis = findAnalysisForTeam(allAnalysisTables, matchInfo.teamA) || { home: [], away: [], global: [] };
+      const teamBOpponentAnalysis = findAnalysisForTeam(allAnalysisTables, matchInfo.teamB) || { home: [], away: [], global: [] };
       console.log(`Análise extraída: Time A =`, {
         home: teamAOpponentAnalysis.home.length,
         away: teamAOpponentAnalysis.away.length,
