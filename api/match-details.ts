@@ -85,43 +85,59 @@ function findTeamNameInHTML(html: string, searchName: string): string | null {
 function extractLast10Matches(html: string, teamName: string): Match[] {
   const matches: Match[] = [];
   
+  console.log(`[extractLast10Matches] Buscando form para: ${teamName}`);
+  
   // Encontra o nome exato do time no HTML
-  const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
+  const actualTeamName = findTeamNameInHTML(html, teamName);
+  console.log(`[extractLast10Matches] Nome encontrado no HTML: ${actualTeamName || 'NÃO ENCONTRADO'}`);
+  
+  const searchName = actualTeamName || teamName;
   
   // Procura pela seção do time específico (mais flexível)
   let teamMatch: RegExpMatchArray | null = null;
   
-  if (actualTeamName) {
-    const escaped = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (searchName) {
+    const escaped = searchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const teamSectionRegex = new RegExp(
       `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${escaped}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
       'i'
     );
     teamMatch = html.match(teamSectionRegex);
+    console.log(`[extractLast10Matches] Estratégia 1 (regex direto): ${teamMatch ? 'ENCONTRADO' : 'NÃO ENCONTRADO'}`);
   }
   
   // Estratégia 2: Busca todas as tabelas stat-last10 e identifica qual é do time
   if (!teamMatch) {
     const searchNormalized = normalizeTeamName(teamName);
+    console.log(`[extractLast10Matches] Estratégia 2: Buscando todas as tabelas. Nome normalizado: ${searchNormalized}`);
+    
     const allLast10Tables = html.matchAll(/<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi);
+    let foundCount = 0;
     for (const last10Match of allLast10Tables) {
+      foundCount++;
       const foundTeamName = last10Match[1].trim();
       const foundNormalized = normalizeTeamName(foundTeamName);
+      console.log(`[extractLast10Matches] Tabela ${foundCount}: "${foundTeamName}" (normalizado: ${foundNormalized})`);
       
       if (foundNormalized === searchNormalized || 
           foundNormalized.includes(searchNormalized) || 
           searchNormalized.includes(foundNormalized)) {
         teamMatch = last10Match;
+        console.log(`[extractLast10Matches] MATCH ENCONTRADO na tabela ${foundCount}!`);
         break;
       }
     }
+    console.log(`[extractLast10Matches] Total de tabelas encontradas: ${foundCount}`);
   }
   
   if (!teamMatch || !teamMatch[teamMatch.length - 1]) {
+    console.log(`[extractLast10Matches] NENHUMA tabela encontrada para ${teamName}`);
     return matches;
   }
 
-  return extractMatchesFromTable(teamMatch[teamMatch.length - 1]);
+  const extracted = extractMatchesFromTable(teamMatch[teamMatch.length - 1]);
+  console.log(`[extractLast10Matches] Extraídos ${extracted.length} jogos da tabela`);
+  return extracted;
 }
 
 // Função auxiliar para extrair jogos de uma tabela
@@ -199,41 +215,57 @@ function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' |
     noDrawStreak: 0
   };
 
+  console.log(`[extractStreaks] Buscando streaks para: ${teamName} (scope: ${scope})`);
+
   // Encontra o nome exato do time no HTML
-  const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
+  const actualTeamName = findTeamNameInHTML(html, teamName);
+  console.log(`[extractStreaks] Nome encontrado no HTML: ${actualTeamName || 'NÃO ENCONTRADO'}`);
+  
+  const searchName = actualTeamName || teamName;
   
   // Procura pela seção de sequências do time específico
   // Tenta múltiplas estratégias
   let match: RegExpMatchArray | null = null;
   
   // Estratégia 1: Busca com nome encontrado
-  if (actualTeamName) {
-    const escaped = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (searchName) {
+    const escaped = searchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const teamSectionRegex = new RegExp(
       `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${escaped}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\\s\\S]*?)</table>`,
       'i'
     );
     match = html.match(teamSectionRegex);
+    console.log(`[extractStreaks] Estratégia 1 (regex direto): ${match ? 'ENCONTRADO' : 'NÃO ENCONTRADO'}`);
   }
   
   // Estratégia 2: Busca todas as tabelas stat-seqs e identifica qual é do time
   if (!match) {
+    const searchNormalized = normalizeTeamName(teamName);
+    console.log(`[extractStreaks] Estratégia 2: Buscando todas as tabelas. Nome normalizado: ${searchNormalized}`);
+    
     const allSeqsTables = html.matchAll(/<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\s\S]*?)<\/table>/gi);
+    let foundCount = 0;
     for (const seqMatch of allSeqsTables) {
+      foundCount++;
       const foundTeamName = seqMatch[1].trim();
       const foundNormalized = normalizeTeamName(foundTeamName);
-      const searchNormalized = normalizeTeamName(teamName);
+      console.log(`[extractStreaks] Tabela ${foundCount}: "${foundTeamName}" (normalizado: ${foundNormalized})`);
       
       if (foundNormalized === searchNormalized || 
           foundNormalized.includes(searchNormalized) || 
           searchNormalized.includes(foundNormalized)) {
         match = seqMatch;
+        console.log(`[extractStreaks] MATCH ENCONTRADO na tabela ${foundCount}!`);
         break;
       }
     }
+    console.log(`[extractStreaks] Total de tabelas encontradas: ${foundCount}`);
   }
   
-  if (!match || !match[match.length - 1]) return defaultStreaks;
+  if (!match || !match[match.length - 1]) {
+    console.log(`[extractStreaks] NENHUMA tabela encontrada para ${teamName}`);
+    return defaultStreaks;
+  }
 
   const tableHtml = match[match.length - 1];
   
@@ -544,36 +576,69 @@ export default async function handler(
         });
       }
 
-      // Extrai dados detalhados
+      console.log('Match Info extraído:', matchInfo);
+
+      // Extrai dados detalhados - com logs detalhados
+      console.log('=== Extraindo Form do Time A ===');
       const teamAForm = extractLast10Matches(html, matchInfo.teamA);
+      console.log(`Time A (${matchInfo.teamA}): ${teamAForm.length} jogos extraídos`);
+      
+      console.log('=== Extraindo Form do Time B ===');
       const teamBForm = extractLast10Matches(html, matchInfo.teamB);
+      console.log(`Time B (${matchInfo.teamB}): ${teamBForm.length} jogos extraídos`);
+      
+      console.log('=== Extraindo H2H ===');
       const h2hData = extractH2HMatches(html);
+      console.log(`H2H: ${h2hData.length} jogos extraídos`);
       
       // Extrai streaks para cada escopo
+      console.log('=== Extraindo Streaks do Time A ===');
       const teamAStreaksHome = extractStreaks(html, matchInfo.teamA, 'home');
+      console.log(`Time A Streaks Home:`, teamAStreaksHome);
       const teamAStreaksAway = extractStreaks(html, matchInfo.teamA, 'away');
+      console.log(`Time A Streaks Away:`, teamAStreaksAway);
       const teamAStreaksGlobal = extractStreaks(html, matchInfo.teamA, 'global');
+      console.log(`Time A Streaks Global:`, teamAStreaksGlobal);
+      
+      console.log('=== Extraindo Streaks do Time B ===');
       const teamBStreaksHome = extractStreaks(html, matchInfo.teamB, 'home');
+      console.log(`Time B Streaks Home:`, teamBStreaksHome);
       const teamBStreaksAway = extractStreaks(html, matchInfo.teamB, 'away');
+      console.log(`Time B Streaks Away:`, teamBStreaksAway);
       const teamBStreaksGlobal = extractStreaks(html, matchInfo.teamB, 'global');
+      console.log(`Time B Streaks Global:`, teamBStreaksGlobal);
       
       // Extrai análise classificativa para cada contexto
+      console.log('=== Extraindo Análise do Time A ===');
       const teamAOpponentAnalysisHome = extractOpponentAnalysis(html, matchInfo.teamA, 'home');
+      console.log(`Time A Analysis Home: ${teamAOpponentAnalysisHome.length} jogos`);
       const teamAOpponentAnalysisAway = extractOpponentAnalysis(html, matchInfo.teamA, 'away');
+      console.log(`Time A Analysis Away: ${teamAOpponentAnalysisAway.length} jogos`);
       const teamAOpponentAnalysisGlobal = extractOpponentAnalysis(html, matchInfo.teamA, 'global');
+      console.log(`Time A Analysis Global: ${teamAOpponentAnalysisGlobal.length} jogos`);
+      
+      console.log('=== Extraindo Análise do Time B ===');
       const teamBOpponentAnalysisHome = extractOpponentAnalysis(html, matchInfo.teamB, 'home');
+      console.log(`Time B Analysis Home: ${teamBOpponentAnalysisHome.length} jogos`);
       const teamBOpponentAnalysisAway = extractOpponentAnalysis(html, matchInfo.teamB, 'away');
+      console.log(`Time B Analysis Away: ${teamBOpponentAnalysisAway.length} jogos`);
       const teamBOpponentAnalysisGlobal = extractOpponentAnalysis(html, matchInfo.teamB, 'global');
+      console.log(`Time B Analysis Global: ${teamBOpponentAnalysisGlobal.length} jogos`);
 
-      // Logs de debug
-      console.log('Extração de dados:', {
+      // Logs de debug resumidos
+      console.log('=== RESUMO DA EXTRAÇÃO ===');
+      console.log({
         teamA: matchInfo.teamA,
         teamB: matchInfo.teamB,
         teamAFormCount: teamAForm.length,
         teamBFormCount: teamBForm.length,
         h2hCount: h2hData.length,
         teamAStreaksHome,
+        teamAStreaksAway,
+        teamAStreaksGlobal,
+        teamBStreaksHome,
         teamBStreaksAway,
+        teamBStreaksGlobal,
         teamAAnalysisHomeCount: teamAOpponentAnalysisHome.length,
         teamAAnalysisAwayCount: teamAOpponentAnalysisAway.length,
         teamAAnalysisGlobalCount: teamAOpponentAnalysisGlobal.length,
