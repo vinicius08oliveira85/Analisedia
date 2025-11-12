@@ -13,6 +13,70 @@ function defaultStreaks(): TeamStreaks {
   };
 }
 
+// Função auxiliar para extrair jogos de uma tabela
+function extractMatchesFromTable(tableHtml: string): Match[] {
+  const matches: Match[] = [];
+  const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rows = tableHtml.match(rowRegex) || [];
+
+  for (const row of rows) {
+    // Pula linhas que não são de dados (header, footer, etc)
+    if (row.includes('thead') || row.includes('Próximos jogos') || row.includes('next_matches_title')) {
+      continue;
+    }
+    
+    const cells: string[] = [];
+    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(row)) !== null) {
+      let cellContent = cellMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Extrai texto de links
+      const linkMatch = cellContent.match(/<a[^>]*>([^<]+)<\/a>/);
+      if (linkMatch) {
+        cellContent = linkMatch[1].trim();
+      }
+      
+      cells.push(cellContent);
+    }
+
+    if (cells.length >= 5) {
+      const date = cells[0] || '';
+      // Pula célula de competição (ícone/flag)
+      const competition = 'Brasileirão Série A'; // Pode ser extraído da célula 1 se necessário
+      const homeTeam = (cells[2] || '').trim();
+      const scoreText = (cells[3] || '0-0').trim();
+      const awayTeam = (cells[4] || '').trim();
+
+      // Pula se for linha vazia ou próximos jogos
+      if (!homeTeam && !awayTeam) continue;
+      if (scoreText === '-' || scoreText === '') continue; // Próximos jogos
+
+      // Extrai placar (pode estar em link)
+      const scoreMatch = scoreText.match(/(\d+)[-:](\d+)/);
+      if (!scoreMatch) continue;
+      
+      const homeScore = parseInt(scoreMatch[1]) || 0;
+      const awayScore = parseInt(scoreMatch[2]) || 0;
+
+      matches.push({
+        date,
+        competition,
+        homeTeam,
+        awayTeam,
+        homeScore,
+        awayScore
+      });
+    }
+  }
+
+  return matches;
+}
+
 // Extrai TODAS as tabelas de form (Últimos 10 jogos) pela estrutura
 function extractAllFormTables(html: string): Match[][] {
   const results: Match[][] = [];
@@ -118,6 +182,87 @@ function extractStreaksFromTable(tableHtml: string): ScopedStats<TeamStreaks> {
     away: awayStreaks,
     global: globalStreaks
   };
+}
+
+// Função auxiliar para extrair análise de uma tabela
+function extractAnalysisFromTable(tableHtml: string, teamName: string, context?: 'home' | 'away'): OpponentAnalysisMatch[] {
+  const analysis: OpponentAnalysisMatch[] = [];
+
+  const rowRegex = /<tr[^>]*class="[^"]*stat-quart-[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rows = tableHtml.match(rowRegex) || [];
+
+  for (const row of rows) {
+    // Pula linhas vazias
+    if (row.trim().match(/^<tr[^>]*>[\s&nbsp;]*<\/tr>$/i)) continue;
+    
+    const cells: string[] = [];
+    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(row)) !== null) {
+      let cellContent = cellMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Extrai texto de links
+      const linkMatch = cellContent.match(/<a[^>]*>([^<]+)<\/a>/);
+      if (linkMatch) {
+        cellContent = linkMatch[1].trim();
+      }
+      
+      cells.push(cellContent);
+    }
+
+    if (cells.length >= 6) {
+      const rankText = (cells[0] || '').replace(/[^\d]/g, '');
+      const opponentRank = rankText ? parseInt(rankText) : 0;
+      const homeTeam = (cells[1] || '').trim();
+      const scoreText = (cells[2] || '0-0').trim();
+      const awayTeam = (cells[3] || '').trim();
+      const awayRankText = (cells[4] || '').replace(/[^\d]/g, '');
+      const firstGoal = (cells[5] || '-').trim();
+
+      // Pula se não tiver times válidos
+      if (!homeTeam && !awayTeam) continue;
+      
+      // Extrai placar (pode estar em link)
+      const scoreMatch = scoreText.match(/(\d+)[-:](\d+)/);
+      if (!scoreMatch) continue;
+      
+      const homeScore = parseInt(scoreMatch[1]) || 0;
+      const awayScore = parseInt(scoreMatch[2]) || 0;
+
+      // Filtra por contexto se especificado
+      const normalizedHomeTeam = normalizeTeamName(homeTeam);
+      const normalizedAwayTeam = normalizeTeamName(awayTeam);
+      const normalizedTeamName = normalizeTeamName(teamName);
+      
+      // Se contexto especificado, filtra apenas jogos onde o time está no contexto correto
+      if (context === 'home' && normalizedHomeTeam !== normalizedTeamName) continue;
+      if (context === 'away' && normalizedAwayTeam !== normalizedTeamName) continue;
+
+      // Determina resultado baseado no time atual
+      let result: 'V' | 'E' | 'D' = 'E';
+      if (normalizedHomeTeam === normalizedTeamName) {
+        result = homeScore > awayScore ? 'V' : homeScore < awayScore ? 'D' : 'E';
+      } else if (normalizedAwayTeam === normalizedTeamName) {
+        result = awayScore > homeScore ? 'V' : awayScore < homeScore ? 'D' : 'E';
+      }
+
+      analysis.push({
+        opponentRank,
+        homeTeam,
+        awayTeam,
+        score: `${homeScore}-${awayScore}`,
+        result,
+        date: '', // Data não está disponível nesta tabela
+        firstGoal
+      });
+    }
+  }
+
+  return analysis;
 }
 
 // Extrai TODAS as tabelas de análise classificativa pela estrutura
@@ -297,70 +442,6 @@ function extractLast10Matches(html: string, teamName: string): Match[] {
   const extracted = extractMatchesFromTable(teamMatch[teamMatch.length - 1]);
   console.log(`[extractLast10Matches] Extraídos ${extracted.length} jogos da tabela`);
   return extracted;
-}
-
-// Função auxiliar para extrair jogos de uma tabela
-function extractMatchesFromTable(tableHtml: string): Match[] {
-  const matches: Match[] = [];
-  const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
-  const rows = tableHtml.match(rowRegex) || [];
-
-  for (const row of rows) {
-    // Pula linhas que não são de dados (header, footer, etc)
-    if (row.includes('thead') || row.includes('Próximos jogos') || row.includes('next_matches_title')) {
-      continue;
-    }
-    
-    const cells: string[] = [];
-    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    let cellMatch;
-    while ((cellMatch = cellRegex.exec(row)) !== null) {
-      let cellContent = cellMatch[1]
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      // Extrai texto de links
-      const linkMatch = cellContent.match(/<a[^>]*>([^<]+)<\/a>/);
-      if (linkMatch) {
-        cellContent = linkMatch[1].trim();
-      }
-      
-      cells.push(cellContent);
-    }
-
-    if (cells.length >= 5) {
-      const date = cells[0] || '';
-      // Pula célula de competição (ícone/flag)
-      const competition = 'Brasileirão Série A'; // Pode ser extraído da célula 1 se necessário
-      const homeTeam = (cells[2] || '').trim();
-      const scoreText = (cells[3] || '0-0').trim();
-      const awayTeam = (cells[4] || '').trim();
-
-      // Pula se for linha vazia ou próximos jogos
-      if (!homeTeam && !awayTeam) continue;
-      if (scoreText === '-' || scoreText === '') continue; // Próximos jogos
-
-      // Extrai placar (pode estar em link)
-      const scoreMatch = scoreText.match(/(\d+)[-:](\d+)/);
-      if (!scoreMatch) continue;
-      
-      const homeScore = parseInt(scoreMatch[1]) || 0;
-      const awayScore = parseInt(scoreMatch[2]) || 0;
-
-      matches.push({
-        date,
-        competition,
-        homeTeam,
-        awayTeam,
-        homeScore,
-        awayScore
-      });
-    }
-  }
-
-  return matches;
 }
 
 // Função para extrair sequências (stat-seqs)
@@ -543,87 +624,6 @@ function extractOpponentAnalysis(html: string, teamName: string, context: 'home'
   
   // Extrai apenas jogos do contexto específico (Casa ou Fora)
   return extractAnalysisFromTable(match[match.length - 1], actualTeamName, context);
-}
-
-// Função auxiliar para extrair análise de uma tabela
-function extractAnalysisFromTable(tableHtml: string, teamName: string, context?: 'home' | 'away'): OpponentAnalysisMatch[] {
-  const analysis: OpponentAnalysisMatch[] = [];
-
-  const rowRegex = /<tr[^>]*class="[^"]*stat-quart-[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
-  const rows = tableHtml.match(rowRegex) || [];
-
-  for (const row of rows) {
-    // Pula linhas vazias
-    if (row.trim().match(/^<tr[^>]*>[\s&nbsp;]*<\/tr>$/i)) continue;
-    
-    const cells: string[] = [];
-    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    let cellMatch;
-    while ((cellMatch = cellRegex.exec(row)) !== null) {
-      let cellContent = cellMatch[1]
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      // Extrai texto de links
-      const linkMatch = cellContent.match(/<a[^>]*>([^<]+)<\/a>/);
-      if (linkMatch) {
-        cellContent = linkMatch[1].trim();
-      }
-      
-      cells.push(cellContent);
-    }
-
-    if (cells.length >= 6) {
-      const rankText = (cells[0] || '').replace(/[^\d]/g, '');
-      const opponentRank = rankText ? parseInt(rankText) : 0;
-      const homeTeam = (cells[1] || '').trim();
-      const scoreText = (cells[2] || '0-0').trim();
-      const awayTeam = (cells[3] || '').trim();
-      const awayRankText = (cells[4] || '').replace(/[^\d]/g, '');
-      const firstGoal = (cells[5] || '-').trim();
-
-      // Pula se não tiver times válidos
-      if (!homeTeam && !awayTeam) continue;
-      
-      // Extrai placar (pode estar em link)
-      const scoreMatch = scoreText.match(/(\d+)[-:](\d+)/);
-      if (!scoreMatch) continue;
-      
-      const homeScore = parseInt(scoreMatch[1]) || 0;
-      const awayScore = parseInt(scoreMatch[2]) || 0;
-
-      // Filtra por contexto se especificado
-      const normalizedHomeTeam = normalizeTeamName(homeTeam);
-      const normalizedAwayTeam = normalizeTeamName(awayTeam);
-      const normalizedTeamName = normalizeTeamName(teamName);
-      
-      // Se contexto especificado, filtra apenas jogos onde o time está no contexto correto
-      if (context === 'home' && normalizedHomeTeam !== normalizedTeamName) continue;
-      if (context === 'away' && normalizedAwayTeam !== normalizedTeamName) continue;
-
-      // Determina resultado baseado no time atual
-      let result: 'V' | 'E' | 'D' = 'E';
-      if (normalizedHomeTeam === normalizedTeamName) {
-        result = homeScore > awayScore ? 'V' : homeScore < awayScore ? 'D' : 'E';
-      } else if (normalizedAwayTeam === normalizedTeamName) {
-        result = awayScore > homeScore ? 'V' : awayScore < homeScore ? 'D' : 'E';
-      }
-
-      analysis.push({
-        opponentRank,
-        homeTeam,
-        awayTeam,
-        score: `${homeScore}-${awayScore}`,
-        result,
-        date: '', // Data não está disponível nesta tabela
-        firstGoal
-      });
-    }
-  }
-
-  return analysis;
 }
 
 // Função para extrair confronto direto (stat-cd3)
