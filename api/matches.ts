@@ -35,24 +35,118 @@ interface SchemaData {
 function extractMatchesFromHTML(html: string): SportsEvent[] {
   const matches: SportsEvent[] = [];
   
-  // Procura por scripts com application/ld+json
-  const jsonScriptRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gs;
-  const matches_found = html.match(jsonScriptRegex);
+  // Estratégia 1: Procura por scripts com application/ld+json (mais flexível)
+  // Aceita qualquer combinação de atributos antes do conteúdo JSON
+  const jsonScriptRegex = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
+  let scriptMatch;
   
-  if (matches_found) {
-    for (const scriptContent of matches_found) {
+  while ((scriptMatch = jsonScriptRegex.exec(html)) !== null) {
+    const scriptContent = scriptMatch[1];
+    // Remove qualquer espaço em branco inicial/final
+    const cleanedContent = scriptContent.trim();
+    
+    try {
+      // Tenta parsear diretamente
+      const data: SchemaData = JSON.parse(cleanedContent);
+      
+      // Verifica se tem @graph
+      if (data['@graph'] && Array.isArray(data['@graph'])) {
+        const sportsEvents = data['@graph'].filter((event: any) => event['@type'] === 'SportsEvent');
+        matches.push(...sportsEvents);
+        continue; // Sucesso, continua para próximo script
+      }
+      // Se não tem @graph mas é um SportsEvent direto
+      else if (data['@type'] === 'SportsEvent') {
+        matches.push(data as SportsEvent);
+        continue;
+      }
+    } catch (error) {
+      // Se falhou, tenta extrair JSON do conteúdo
       try {
-        // Remove tags HTML e extrai JSON
-        const jsonMatch = scriptContent.match(/\{[\s\S]*\}/);
+        // Procura por objeto JSON completo no conteúdo
+        const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const data: SchemaData = JSON.parse(jsonMatch[0]);
           if (data['@graph'] && Array.isArray(data['@graph'])) {
-            matches.push(...data['@graph'].filter(event => event['@type'] === 'SportsEvent'));
+            const sportsEvents = data['@graph'].filter((event: any) => event['@type'] === 'SportsEvent');
+            matches.push(...sportsEvents);
+            continue;
           }
         }
-      } catch (error) {
-        console.error('Erro ao parsear JSON:', error);
+      } catch (e) {
+        // Continua para próxima tentativa
       }
+    }
+  }
+  
+  // Estratégia 2: Se não encontrou nada, procura diretamente por JSON no HTML
+  if (matches.length === 0) {
+    try {
+      // Procura por padrão @graph com SportsEvent
+      const graphRegex = /\{"@context":"https:\/\/schema\.org\/"[^}]*"@graph":\[([\s\S]*?)\]\}/;
+      const graphMatch = html.match(graphRegex);
+      
+      if (graphMatch) {
+        // Tenta reconstruir o JSON completo
+        const graphContent = graphMatch[1];
+        // Verifica se há múltiplos objetos no array
+        const events = graphContent.split(/\},\s*\{/);
+        
+        for (let i = 0; i < events.length; i++) {
+          let eventStr = events[i];
+          if (i > 0) eventStr = '{' + eventStr;
+          if (i < events.length - 1) eventStr = eventStr + '}';
+          
+          try {
+            const event = JSON.parse(eventStr);
+            if (event['@type'] === 'SportsEvent') {
+              matches.push(event);
+            }
+          } catch (e) {
+            // Ignora eventos inválidos
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Erro na extração alternativa:', e);
+    }
+  }
+  
+  // Estratégia 3: Procura por qualquer objeto SportsEvent no HTML
+  if (matches.length === 0) {
+    try {
+      const sportsEventRegex = /\{"@type":"SportsEvent"[^}]*"homeTeam":\{[^}]*"name":"([^"]+)"[^}]*\}[^}]*"awayTeam":\{[^}]*"name":"([^"]+)"[^}]*\}[^}]*\}/g;
+      let eventMatch;
+      
+      while ((eventMatch = sportsEventRegex.exec(html)) !== null) {
+        // Tenta extrair o objeto completo
+        const startPos = eventMatch.index;
+        let braceCount = 0;
+        let jsonStr = '';
+        let pos = startPos;
+        
+        while (pos < html.length) {
+          const char = html[pos];
+          jsonStr += char;
+          if (char === '{') braceCount++;
+          if (char === '}') {
+            braceCount--;
+            if (braceCount === 0) break;
+          }
+          pos++;
+        }
+        
+        try {
+          const event = JSON.parse(jsonStr);
+          if (event['@type'] === 'SportsEvent') {
+            matches.push(event);
+          }
+        } catch (e) {
+          // Ignora
+        }
+      }
+    } catch (e) {
+      // Ignora
     }
   }
   
@@ -253,17 +347,35 @@ export default async function handler(
         });
       }
 
+      console.log('HTML recebido, tamanho:', html.length);
+      
       // Extrai os eventos do HTML
       const events = extractMatchesFromHTML(html);
       
+      console.log('Eventos extraídos:', events.length);
+      
       if (events.length === 0) {
+        // Tenta encontrar o motivo
+        const hasScript = html.includes('application/ld+json');
+        const hasSportsEvent = html.includes('SportsEvent');
+        const hasGraph = html.includes('@graph');
+        
         return res.status(400).json({ 
-          error: 'Nenhum jogo encontrado no HTML fornecido' 
+          error: 'Nenhum jogo encontrado no HTML fornecido',
+          debug: {
+            htmlLength: html.length,
+            hasScript: hasScript,
+            hasSportsEvent: hasSportsEvent,
+            hasGraph: hasGraph,
+            sample: html.substring(0, 500) // Primeiros 500 caracteres para debug
+          }
         });
       }
 
       // Converte para MatchDetails
       const matches = events.map(convertToMatchDetails).filter(m => m.id) as MatchDetails[];
+
+      console.log('Matches convertidos:', matches.length);
 
       // Aqui você pode salvar no banco de dados (Supabase) se necessário
       // Por enquanto, apenas retorna os dados processados
@@ -278,7 +390,8 @@ export default async function handler(
       console.error('Erro ao processar jogos:', error);
       return res.status(500).json({ 
         error: 'Erro ao processar jogos',
-        details: error instanceof Error ? error.message : 'Erro desconhecido'
+        details: error instanceof Error ? error.message : 'Erro desconhecido',
+        stack: error instanceof Error ? error.stack : undefined
       });
     }
   }
