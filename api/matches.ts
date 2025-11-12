@@ -35,41 +35,53 @@ interface SchemaData {
 function extractMatchesFromHTML(html: string): SportsEvent[] {
   const matches: SportsEvent[] = [];
   
-  // Estratégia 1: Procura por scripts com application/ld+json (mais flexível)
-  // Aceita qualquer combinação de atributos antes do conteúdo JSON
+  // Estratégia 1: Procura por scripts com application/ld+json
+  // Aceita qualquer combinação de atributos (type=module, data-force, etc.)
   const jsonScriptRegex = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
   let scriptMatch;
   
   while ((scriptMatch = jsonScriptRegex.exec(html)) !== null) {
-    const scriptContent = scriptMatch[1];
-    // Remove qualquer espaço em branco inicial/final
-    const cleanedContent = scriptContent.trim();
+    const scriptContent = scriptMatch[1].trim();
+    
+    if (!scriptContent) continue;
     
     try {
       // Tenta parsear diretamente
-      const data: SchemaData = JSON.parse(cleanedContent);
+      const data: any = JSON.parse(scriptContent);
       
       // Verifica se tem @graph
       if (data['@graph'] && Array.isArray(data['@graph'])) {
-        const sportsEvents = data['@graph'].filter((event: any) => event['@type'] === 'SportsEvent');
-        matches.push(...sportsEvents);
-        continue; // Sucesso, continua para próximo script
+        const sportsEvents = data['@graph'].filter((event: any) => 
+          event && event['@type'] === 'SportsEvent'
+        );
+        if (sportsEvents.length > 0) {
+          matches.push(...sportsEvents);
+          continue; // Sucesso, continua para próximo script
+        }
       }
       // Se não tem @graph mas é um SportsEvent direto
-      else if (data['@type'] === 'SportsEvent') {
+      if (data['@type'] === 'SportsEvent') {
         matches.push(data as SportsEvent);
         continue;
       }
     } catch (error) {
-      // Se falhou, tenta extrair JSON do conteúdo
+      // Se falhou, tenta extrair JSON do conteúdo de forma mais agressiva
       try {
-        // Procura por objeto JSON completo no conteúdo
-        const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+        // Procura por objeto JSON completo no conteúdo (pode estar minificado)
+        const jsonMatch = scriptContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          const data: SchemaData = JSON.parse(jsonMatch[0]);
+          const data: any = JSON.parse(jsonMatch[0]);
           if (data['@graph'] && Array.isArray(data['@graph'])) {
-            const sportsEvents = data['@graph'].filter((event: any) => event['@type'] === 'SportsEvent');
-            matches.push(...sportsEvents);
+            const sportsEvents = data['@graph'].filter((event: any) => 
+              event && event['@type'] === 'SportsEvent'
+            );
+            if (sportsEvents.length > 0) {
+              matches.push(...sportsEvents);
+              continue;
+            }
+          }
+          if (data['@type'] === 'SportsEvent') {
+            matches.push(data as SportsEvent);
             continue;
           }
         }
@@ -79,31 +91,38 @@ function extractMatchesFromHTML(html: string): SportsEvent[] {
     }
   }
   
-  // Estratégia 2: Se não encontrou nada, procura diretamente por JSON no HTML
+  // Estratégia 2: Se não encontrou nada, procura diretamente por JSON no HTML (sem script tag)
   if (matches.length === 0) {
     try {
-      // Procura por padrão @graph com SportsEvent
-      const graphRegex = /\{"@context":"https:\/\/schema\.org\/"[^}]*"@graph":\[([\s\S]*?)\]\}/;
-      const graphMatch = html.match(graphRegex);
+      // Procura por padrão @graph com SportsEvent em qualquer lugar do HTML
+      const graphPattern = /\{"@context":"https:\/\/schema\.org\/"[^}]*"@graph":\[([\s\S]*?)\]\}/;
+      const graphMatch = html.match(graphPattern);
       
-      if (graphMatch) {
-        // Tenta reconstruir o JSON completo
-        const graphContent = graphMatch[1];
-        // Verifica se há múltiplos objetos no array
-        const events = graphContent.split(/\},\s*\{/);
-        
-        for (let i = 0; i < events.length; i++) {
-          let eventStr = events[i];
-          if (i > 0) eventStr = '{' + eventStr;
-          if (i < events.length - 1) eventStr = eventStr + '}';
+      if (graphMatch && graphMatch[0]) {
+        try {
+          const data: any = JSON.parse(graphMatch[0]);
+          if (data['@graph'] && Array.isArray(data['@graph'])) {
+            const sportsEvents = data['@graph'].filter((event: any) => 
+              event && event['@type'] === 'SportsEvent'
+            );
+            matches.push(...sportsEvents);
+          }
+        } catch (e) {
+          // Tenta extrair eventos individuais
+          const graphContent = graphMatch[1];
+          // Procura por objetos SportsEvent individuais
+          const eventPattern = /\{"@type":"SportsEvent"[\s\S]*?"homeTeam":\{[\s\S]*?\}[\s\S]*?"awayTeam":\{[\s\S]*?\}[\s\S]*?\}/g;
+          let eventMatch;
           
-          try {
-            const event = JSON.parse(eventStr);
-            if (event['@type'] === 'SportsEvent') {
-              matches.push(event);
+          while ((eventMatch = eventPattern.exec(graphContent)) !== null) {
+            try {
+              const event = JSON.parse(eventMatch[0]);
+              if (event['@type'] === 'SportsEvent') {
+                matches.push(event);
+              }
+            } catch (e) {
+              // Ignora eventos inválidos
             }
-          } catch (e) {
-            // Ignora eventos inválidos
           }
         }
       }
@@ -112,37 +131,51 @@ function extractMatchesFromHTML(html: string): SportsEvent[] {
     }
   }
   
-  // Estratégia 3: Procura por qualquer objeto SportsEvent no HTML
+  // Estratégia 3: Procura por qualquer objeto SportsEvent no HTML (última tentativa)
   if (matches.length === 0) {
     try {
-      const sportsEventRegex = /\{"@type":"SportsEvent"[^}]*"homeTeam":\{[^}]*"name":"([^"]+)"[^}]*\}[^}]*"awayTeam":\{[^}]*"name":"([^"]+)"[^}]*\}[^}]*\}/g;
-      let eventMatch;
+      // Procura pelo início de um SportsEvent
+      const startPattern = /"@type":"SportsEvent"/g;
+      let startMatch;
       
-      while ((eventMatch = sportsEventRegex.exec(html)) !== null) {
-        // Tenta extrair o objeto completo
-        const startPos = eventMatch.index;
-        let braceCount = 0;
-        let jsonStr = '';
-        let pos = startPos;
+      while ((startMatch = startPattern.exec(html)) !== null) {
+        // Volta para encontrar o início do objeto
+        let pos = startMatch.index;
+        while (pos > 0 && html[pos] !== '{') pos--;
         
-        while (pos < html.length) {
-          const char = html[pos];
-          jsonStr += char;
-          if (char === '{') braceCount++;
-          if (char === '}') {
-            braceCount--;
-            if (braceCount === 0) break;
+        if (pos >= 0) {
+          // Extrai o objeto completo contando chaves
+          let braceCount = 0;
+          let jsonStr = '';
+          let currentPos = pos;
+          
+          while (currentPos < html.length) {
+            const char = html[currentPos];
+            jsonStr += char;
+            if (char === '{') braceCount++;
+            if (char === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                try {
+                  const event = JSON.parse(jsonStr);
+                  if (event['@type'] === 'SportsEvent' && event.homeTeam && event.awayTeam) {
+                    // Verifica se já não foi adicionado
+                    const exists = matches.some(m => 
+                      m.homeTeam.name === event.homeTeam.name && 
+                      m.awayTeam.name === event.awayTeam.name
+                    );
+                    if (!exists) {
+                      matches.push(event);
+                    }
+                  }
+                } catch (e) {
+                  // Ignora
+                }
+                break;
+              }
+            }
+            currentPos++;
           }
-          pos++;
-        }
-        
-        try {
-          const event = JSON.parse(jsonStr);
-          if (event['@type'] === 'SportsEvent') {
-            matches.push(event);
-          }
-        } catch (e) {
-          // Ignora
         }
       }
     } catch (e) {
