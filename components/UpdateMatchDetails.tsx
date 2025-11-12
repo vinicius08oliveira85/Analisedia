@@ -21,7 +21,9 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
 
     try {
       const result: MatchDetailsResponse = await uploadMatchDetailsFile(file, match.id);
+      console.log('Resposta da API:', result);
       const updatedMatch = applyMatchDetailsUpdate(match, result.data);
+      console.log('Match atualizado:', updatedMatch);
       setMessage({ type: 'success', text: result.message });
       onDetailsUpdated(updatedMatch);
       
@@ -49,7 +51,9 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
       setMessage(null);
 
       const result: MatchDetailsResponse = await updateMatchDetailsFromHTML(html, match.id);
+      console.log('Resposta da API:', result);
       const updatedMatch = applyMatchDetailsUpdate(match, result.data);
+      console.log('Match atualizado:', updatedMatch);
       setMessage({ type: 'success', text: result.message });
       onDetailsUpdated(updatedMatch);
     } catch (error) {

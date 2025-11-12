@@ -81,6 +81,16 @@ export function applyMatchDetailsUpdate(
   currentMatch: MatchDetails,
   update: MatchDetailsResponse['data']
 ): MatchDetails {
+  console.log('Aplicando atualização de detalhes:', {
+    teamAFormCount: update.teamAForm.length,
+    teamBFormCount: update.teamBForm.length,
+    h2hCount: update.h2hData.length,
+    teamAStreaks: update.teamAStreaks,
+    teamBStreaks: update.teamBStreaks,
+    teamAAnalysisCount: update.teamAOpponentAnalysis.home.length + update.teamAOpponentAnalysis.global.length,
+    teamBAnalysisCount: update.teamBOpponentAnalysis.away.length + update.teamBOpponentAnalysis.global.length
+  });
+
   return {
     ...currentMatch,
     teamAForm: update.teamAForm.length > 0 ? update.teamAForm : currentMatch.teamAForm,
