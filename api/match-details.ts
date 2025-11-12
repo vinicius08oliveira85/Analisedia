@@ -180,8 +180,13 @@ function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' |
   if (!match) return defaultStreaks;
 
   const tableHtml = match[1];
+  
+  // Remove o thead se existir
+  const tbodyMatch = tableHtml.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+  const contentToParse = tbodyMatch ? tbodyMatch[1] : tableHtml;
+  
   const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
-  const rows = tableHtml.match(rowRegex) || [];
+  const rows = contentToParse.match(rowRegex) || [];
 
   const streaks: TeamStreaks = { ...defaultStreaks };
   
@@ -190,11 +195,14 @@ function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' |
   const colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 3;
 
   for (const row of rows) {
+    // Pula o thead se ainda estiver presente
+    if (row.includes('<thead') || row.includes('</thead>')) continue;
+    
     const cells: string[] = [];
     const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
     let cellMatch;
     while ((cellMatch = cellRegex.exec(row)) !== null) {
-      const cellContent = cellMatch[1]
+      let cellContent = cellMatch[1]
         .replace(/<[^>]+>/g, ' ')
         .replace(/&nbsp;/g, ' ')
         .replace(/\s+/g, ' ')
@@ -204,8 +212,8 @@ function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' |
 
     if (cells.length > colIndex) {
       const label = (cells[0] || '').toLowerCase();
-      const value = cells[colIndex] || '-';
-      const numValue = value === '-' ? 0 : parseInt(value) || 0;
+      const value = (cells[colIndex] || '-').trim();
+      const numValue = value === '-' || value === '' ? 0 : parseInt(value) || 0;
       
       if (label.includes('vitória') && label.includes('corrente')) {
         streaks.winStreak = numValue;
@@ -213,11 +221,11 @@ function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' |
         streaks.drawStreak = numValue;
       } else if (label.includes('derrota') && label.includes('corrente')) {
         streaks.lossStreak = numValue;
-      } else if (label.includes('sem perder')) {
+      } else if (label.includes('não perde') || label.includes('sem perder')) {
         streaks.unbeatenStreak = numValue;
-      } else if (label.includes('sem vencer')) {
+      } else if (label.includes('não ganha') || label.includes('sem vencer')) {
         streaks.winlessStreak = numValue;
-      } else if (label.includes('sem empatar')) {
+      } else if (label.includes('não empata') || label.includes('sem empatar')) {
         streaks.noDrawStreak = numValue;
       }
     }
