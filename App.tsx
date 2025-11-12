@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { MatchList } from './components/MatchList';
 import { MatchDetail } from './components/MatchDetail';
+import { UpdateMatches } from './components/UpdateMatches';
 import { allMatchesData } from './data';
 import type { MatchDetails } from './types';
 
 const App: React.FC = () => {
+  const [matches, setMatches] = useState<MatchDetails[]>(allMatchesData);
   const [selectedMatch, setSelectedMatch] = useState<MatchDetails | null>(null);
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
@@ -21,12 +23,38 @@ const App: React.FC = () => {
     try {
       window.localStorage.setItem('favoriteMatches', JSON.stringify(favorites));
     } catch (error) {
-        console.error("Could not save favorites to localStorage", error);
+      console.error("Could not save favorites to localStorage", error);
     }
   }, [favorites]);
 
+  // Carrega jogos salvos do localStorage ao iniciar
+  useEffect(() => {
+    try {
+      const savedMatches = window.localStorage.getItem('updatedMatches');
+      if (savedMatches) {
+        const parsedMatches = JSON.parse(savedMatches);
+        if (Array.isArray(parsedMatches) && parsedMatches.length > 0) {
+          setMatches(parsedMatches);
+        }
+      }
+    } catch (error) {
+      console.error("Could not load matches from localStorage", error);
+    }
+  }, []);
+
+  const handleMatchesUpdated = (updatedMatches: MatchDetails[]) => {
+    // Salva no localStorage
+    try {
+      window.localStorage.setItem('updatedMatches', JSON.stringify(updatedMatches));
+    } catch (error) {
+      console.error("Could not save matches to localStorage", error);
+    }
+    setMatches(updatedMatches);
+    setSelectedMatch(null); // Volta para a lista
+  };
+
   const handleSelectMatch = (matchId: string) => {
-    const match = allMatchesData.find(m => m.id === matchId);
+    const match = matches.find(m => m.id === matchId);
     if (match) {
       setSelectedMatch(match);
     }
@@ -50,6 +78,9 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {!selectedMatch && (
+          <UpdateMatches onMatchesUpdated={handleMatchesUpdated} />
+        )}
         {selectedMatch ? (
           <MatchDetail 
             match={selectedMatch} 
@@ -59,7 +90,7 @@ const App: React.FC = () => {
           />
         ) : (
           <MatchList 
-            matches={allMatchesData} 
+            matches={matches} 
             onSelectMatch={handleSelectMatch}
             favorites={favorites}
             onToggleFavorite={handleToggleFavorite}
@@ -67,7 +98,7 @@ const App: React.FC = () => {
         )}
       </main>
       <footer className="text-center py-4 text-gray-500 text-sm">
-        <p>Desenvolvido com React e Tailwind CSS. Dados estáticos extraídos da web.</p>
+        <p>Desenvolvido com React e Tailwind CSS. Dados atualizados via API.</p>
       </footer>
     </div>
   );
