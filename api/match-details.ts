@@ -89,21 +89,39 @@ function extractLast10Matches(html: string, teamName: string): Match[] {
   const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
   
   // Procura pela seção do time específico (mais flexível)
-  const teamSectionRegex = new RegExp(
-    `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
-    'i'
-  );
+  let teamMatch: RegExpMatchArray | null = null;
   
-  const teamMatch = html.match(teamSectionRegex);
+  if (actualTeamName) {
+    const escaped = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const teamSectionRegex = new RegExp(
+      `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${escaped}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+      'i'
+    );
+    teamMatch = html.match(teamSectionRegex);
+  }
+  
+  // Estratégia 2: Busca todas as tabelas stat-last10 e identifica qual é do time
   if (!teamMatch) {
-    // Tenta sem o nome do time, apenas procurando pela primeira tabela stat-last10
-    const fallbackRegex = /<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/i;
-    const fallbackMatch = html.match(fallbackRegex);
-    if (!fallbackMatch) return matches;
-    return extractMatchesFromTable(fallbackMatch[1]);
+    const searchNormalized = normalizeTeamName(teamName);
+    const allLast10Tables = html.matchAll(/<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi);
+    for (const last10Match of allLast10Tables) {
+      const foundTeamName = last10Match[1].trim();
+      const foundNormalized = normalizeTeamName(foundTeamName);
+      
+      if (foundNormalized === searchNormalized || 
+          foundNormalized.includes(searchNormalized) || 
+          searchNormalized.includes(foundNormalized)) {
+        teamMatch = last10Match;
+        break;
+      }
+    }
+  }
+  
+  if (!teamMatch || !teamMatch[teamMatch.length - 1]) {
+    return matches;
   }
 
-  return extractMatchesFromTable(teamMatch[1]);
+  return extractMatchesFromTable(teamMatch[teamMatch.length - 1]);
 }
 
 // Função auxiliar para extrair jogos de uma tabela
