@@ -4,15 +4,21 @@ Sistema completo para atualizar os jogos do dia no aplicativo Futibou Analytics 
 
 ## 📋 Como Funciona
 
-1. **API Serverless** (`/api/matches.ts`): Processa HTML e extrai dados de jogos
-2. **Serviço Frontend** (`/services/matchesService.ts`): Comunica com a API
-3. **Componente de Atualização** (`/components/UpdateMatches.tsx`): Interface para upload/colar HTML
+1. **API Serverless** (`/api/matches.ts`): Processa HTML, converte em `MatchDetails` e persiste no Supabase.
+2. **API de Automação** (`/api/update-daily-matches.ts`): Faz o scraping automático diário e dispara a atualização.
+3. **Serviço Frontend** (`/services/matchesService.ts`): Busca os jogos diretamente do endpoint.
+4. **Componentes de UI** (`/components/UpdateMatches.tsx`): Interface para upload/colar HTML manualmente quando necessário.
 
 ## 🔧 Estrutura
 
 ```
 api/
-  └── matches.ts          # API serverless (Vercel)
+  ├── matches.ts              # API serverless (processamento manual)
+  └── update-daily-matches.ts # API serverless (atualização automática)
+lib/
+  ├── matchParser.ts          # Funções de parsing de HTML
+  ├── matchStorage.ts         # Persistência em Supabase
+  └── supabase.ts             # Cliente Supabase reutilizável
 services/
   └── matchesService.ts  # Serviço para chamar a API
 components/
@@ -50,66 +56,143 @@ A API extrai os seguintes dados do HTML:
 
 ## 🌐 Endpoints da API
 
-### POST `/api/matches`
+### `POST /api/matches`
 
-Processa HTML e retorna jogos atualizados.
+Processa HTML bruto copiado manualmente e grava os resultados.
 
-**Request:**
+**Body**
 ```json
 {
-  "html": "<!DOCTYPE html>..."
+  "html": "<!DOCTYPE html>...",
+  "sourceUrl": "https://opcionalmentedefinido.com/jogos"
 }
 ```
 
-**Response:**
+- `html` (obrigatório): conteúdo completo da página.
+- `sourceUrl` (opcional): URL de referência salvo junto com o jogo.
+
+**Resposta**
 ```json
 {
   "success": true,
   "count": 3,
-  "matches": [
-    {
-      "id": "atletico-mg-fortaleza",
-      "teamA": {
-        "name": "Atlético-MG",
-        "logo": "https://..."
-      },
-      "teamB": {
-        "name": "Fortaleza",
-        "logo": "https://..."
-      },
-      "matchInfo": {
-        "date": "12 novembro 2025",
-        "time": "20:30",
-        "competition": "Brasileirão Série A"
-      },
-      ...
-    }
-  ],
+  "persisted": 3,
+  "matches": [...],
+  "supabase": { "enabled": true },
   "message": "3 jogos processados com sucesso"
 }
 ```
 
-### GET `/api/matches`
+### `GET /api/matches?date=2025-11-12`
 
-Retorna informações sobre o endpoint (para desenvolvimento).
+Retorna os jogos armazenados para a data informada (padrão: hoje no fuso `America/Sao_Paulo`).
 
-## 💾 Armazenamento
+- `date` (opcional): formato `YYYY-MM-DD`.
 
-Os jogos atualizados são salvos no `localStorage` do navegador com a chave `updatedMatches`. Isso permite que os dados persistam mesmo após recarregar a página.
+**Resposta**
+```json
+{
+  "success": true,
+  "date": "2025-11-12",
+  "count": 6,
+  "matches": [...]
+}
+```
+
+### `POST /api/update-daily-matches`
+
+Endpoint pensado para rodar via Cron (Vercel Scheduler) e atualizar os jogos automaticamente.
+
+**Body opcional**
+```json
+{
+  "date": "2025-11-12",
+  "sourceUrl": "https://override-da-fonte.com",
+  "token": "segredo-opcional",
+  "html": "<html>... apenas para depuração manual</html>"
+}
+```
+
+- `date`: substitui a data padrão.
+- `sourceUrl`: URL fixa para bypassar o template global.
+- `token`: precisa coincidir com `MATCHES_CRON_SECRET` (ou `CRON_SECRET`) se configurado.
+- `html`: se enviado, pula o download remoto (útil para testes).
+
+> Também é possível chamar via `GET /api/update-daily-matches?date=YYYY-MM-DD&token=...`.
+
+**Resposta**
+```json
+{
+  "success": true,
+  "date": "2025-11-12",
+  "sourceUrl": "https://www.academiadasapostasbrasil.com/stats/matches/2025-11-12",
+  "count": 6,
+  "persisted": 6,
+  "matches": [...]
+}
+```
+
+## 💾 Armazenamento no Supabase
+
+Crie uma tabela `daily_matches` (nome configurável via `SUPABASE_MATCHES_TABLE`) com chave primária composta:
+
+```sql
+create table if not exists daily_matches (
+  match_id text not null,
+  match_date date not null,
+  event_start timestamptz,
+  payload jsonb not null,
+  raw_event jsonb,
+  source_url text,
+  updated_at timestamptz default timezone('utc', now()),
+  primary key (match_id, match_date)
+);
+```
+
+- `payload` guarda o objeto `MatchDetails`.
+- `raw_event` mantém o JSON original `SportsEvent` para auditoria.
+- `match_date` é calculado respetando o fuso definido.
+
+### Índice recomendado
+
+```sql
+create index if not exists idx_daily_matches_date
+  on daily_matches (match_date desc, event_start asc);
+```
+
+## 🔐 Variáveis de Ambiente
+
+| Variável | Obrigatória | Descrição |
+| --- | --- | --- |
+| `SUPABASE_URL` | ✅ | URL do projeto Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Chave Service Role (armazenar com proteção em produção) |
+| `SUPABASE_MATCHES_TABLE` | ❌ | Nome da tabela (`daily_matches` por padrão) |
+| `MATCHES_TIMEZONE` | ❌ | Fuso horário para agrupar jogos (default `America/Sao_Paulo`) |
+| `MATCHES_SOURCE_URL_TEMPLATE` | ❌ | Template da URL de scraping (`%DATE%` será substituído) |
+| `MATCHES_CRON_SECRET` / `CRON_SECRET` | ❌ | Token para proteger o endpoint automático |
+| `MATCHES_FETCH_USER_AGENT` | ❌ | User Agent customizado para o scraping |
+
+Configure-as tanto no desenvolvimento (ex.: `.env.local`) quanto no Vercel.
+
+## ⏰ Automação com Vercel Cron
+
+1. Crie um job no [Vercel Scheduler](https://vercel.com/docs/cron-jobs) chamando `POST https://seuapp.vercel.app/api/update-daily-matches`.
+2. Defina um header `Authorization: Bearer <MATCHES_CRON_SECRET>` se estiver usando segredo.
+3. Cron recomendado: `0 9 * * *` (09h BRT → 12h UTC) para garantir os jogos do dia.
+
+## 🔒 Segurança
+
+- Endpoint automático protegido opcionalmente por token (`MATCHES_CRON_SECRET`).
+- Persistência server-side via Supabase Service Role (nunca expor no frontend).
+- Logs e erros tratados para fácil debugging.
 
 ## 🚀 Deploy no Vercel
 
 A API está configurada para funcionar automaticamente no Vercel:
 
-1. ✅ Arquivo em `api/matches.ts` será deployado como serverless function
-2. ✅ Rota `/api/matches` estará disponível automaticamente
-3. ✅ CORS configurado para permitir requisições do frontend
-
-## 🔒 Segurança
-
-- ✅ CORS configurado para permitir requisições do domínio
-- ✅ Validação de entrada (verifica se HTML foi fornecido)
-- ✅ Tratamento de erros robusto
+1. ✅ Funções em `api/*.ts` são publicadas automaticamente.
+2. ✅ Rota `/api/update-daily-matches` pode ser chamada pelo Scheduler.
+3. ✅ CORS liberado para o frontend consumir os dados com segurança.
 
 ## 📊 Limitações
 
@@ -130,8 +213,9 @@ npm install
 # Executar em desenvolvimento
 npm run dev
 
-# A API estará disponível em:
+# Endpoints disponíveis:
 # http://localhost:5173/api/matches
+# http://localhost:5173/api/update-daily-matches
 ```
 
 ## 📝 Exemplo de Uso Programático
@@ -147,10 +231,11 @@ console.log(`${result.count} jogos processados`);
 ## ✅ Checklist de Implementação
 
 - [x] API serverless criada
+- [x] Automação diária com endpoint dedicado
 - [x] Serviço frontend criado
 - [x] Componente de UI criado
 - [x] Integração com App.tsx
-- [x] Persistência no localStorage
+- [x] Persistência no Supabase
 - [x] Tratamento de erros
 - [x] Feedback visual para o usuário
 - [x] CORS configurado
