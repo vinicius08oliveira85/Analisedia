@@ -33,43 +33,114 @@ function extractTableData(html: string, tableClass: string): any[] {
   return results;
 }
 
+// Função para normalizar nome do time (remove acentos, espaços, etc.)
+function normalizeTeamName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-z0-9]/g, '') // Remove caracteres especiais
+    .trim();
+}
+
+// Função para encontrar nome do time no HTML (flexível)
+function findTeamNameInHTML(html: string, searchName: string): string | null {
+  const normalized = normalizeTeamName(searchName);
+  
+  // Procura por variações comuns do nome
+  const variations = [
+    searchName,
+    searchName.replace(/-/g, ' '),
+    searchName.replace(/-/g, ''),
+    searchName.replace(/MG/g, 'Mineiro'),
+    searchName.replace(/Mineiro/g, 'MG'),
+  ];
+  
+  for (const variation of variations) {
+    const regex = new RegExp(`<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]*${variation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*)</span>`, 'i');
+    const match = html.match(regex);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  
+  return null;
+}
+
 // Função para extrair últimos jogos (stat-last10)
 function extractLast10Matches(html: string, teamName: string): Match[] {
   const matches: Match[] = [];
   
-  // Procura pela seção do time específico
+  // Encontra o nome exato do time no HTML
+  const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
+  
+  // Procura pela seção do time específico (mais flexível)
   const teamSectionRegex = new RegExp(
-    `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>${teamName}[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+    `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
     'i'
   );
   
   const teamMatch = html.match(teamSectionRegex);
-  if (!teamMatch) return matches;
+  if (!teamMatch) {
+    // Tenta sem o nome do time, apenas procurando pela primeira tabela stat-last10
+    const fallbackRegex = /<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/i;
+    const fallbackMatch = html.match(fallbackRegex);
+    if (!fallbackMatch) return matches;
+    return extractMatchesFromTable(fallbackMatch[1]);
+  }
 
-  const tableHtml = teamMatch[1];
+  return extractMatchesFromTable(teamMatch[1]);
+}
+
+// Função auxiliar para extrair jogos de uma tabela
+function extractMatchesFromTable(tableHtml: string): Match[] {
+  const matches: Match[] = [];
   const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
   const rows = tableHtml.match(rowRegex) || [];
 
-  for (const row of rows.slice(1)) { // Pula o header
+  for (const row of rows) {
+    // Pula linhas que não são de dados (header, footer, etc)
+    if (row.includes('thead') || row.includes('Próximos jogos') || row.includes('next_matches_title')) {
+      continue;
+    }
+    
     const cells: string[] = [];
     const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
     let cellMatch;
     while ((cellMatch = cellRegex.exec(row)) !== null) {
-      const cellContent = cellMatch[1]
-        .replace(/<[^>]+>/g, '')
+      let cellContent = cellMatch[1]
+        .replace(/<[^>]+>/g, ' ')
         .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
         .trim();
+      
+      // Extrai texto de links
+      const linkMatch = cellContent.match(/<a[^>]*>([^<]+)<\/a>/);
+      if (linkMatch) {
+        cellContent = linkMatch[1].trim();
+      }
+      
       cells.push(cellContent);
     }
 
     if (cells.length >= 5) {
       const date = cells[0] || '';
-      const competition = cells[1] || 'Brasileirão Série A';
-      const homeTeam = cells[2] || '';
-      const score = cells[3] || '0-0';
-      const awayTeam = cells[4] || '';
+      // Pula célula de competição (ícone/flag)
+      const competition = 'Brasileirão Série A'; // Pode ser extraído da célula 1 se necessário
+      const homeTeam = (cells[2] || '').trim();
+      const scoreText = (cells[3] || '0-0').trim();
+      const awayTeam = (cells[4] || '').trim();
 
-      const [homeScore, awayScore] = score.split(':').map(s => parseInt(s.trim()) || 0);
+      // Pula se for linha vazia ou próximos jogos
+      if (!homeTeam && !awayTeam) continue;
+      if (scoreText === '-' || scoreText === '') continue; // Próximos jogos
+
+      // Extrai placar (pode estar em link)
+      const scoreMatch = scoreText.match(/(\d+)[-:](\d+)/);
+      if (!scoreMatch) continue;
+      
+      const homeScore = parseInt(scoreMatch[1]) || 0;
+      const awayScore = parseInt(scoreMatch[2]) || 0;
 
       matches.push({
         date,
@@ -86,7 +157,7 @@ function extractLast10Matches(html: string, teamName: string): Match[] {
 }
 
 // Função para extrair sequências (stat-seqs)
-function extractStreaks(html: string, teamName: string): TeamStreaks {
+function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' | 'global' = 'home'): TeamStreaks {
   const defaultStreaks: TeamStreaks = {
     winStreak: 0,
     drawStreak: 0,
@@ -96,47 +167,59 @@ function extractStreaks(html: string, teamName: string): TeamStreaks {
     noDrawStreak: 0
   };
 
-  // Procura pela seção de sequências
-  const streaksRegex = new RegExp(
-    `Sequência[\\s\\S]*?${teamName}[\\s\\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+  // Encontra o nome exato do time no HTML
+  const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
+  
+  // Procura pela seção de sequências do time específico
+  const teamSectionRegex = new RegExp(
+    `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\\s\\S]*?)</table>`,
     'i'
   );
 
-  const match = html.match(streaksRegex);
+  const match = html.match(teamSectionRegex);
   if (!match) return defaultStreaks;
 
   const tableHtml = match[1];
-  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
   const rows = tableHtml.match(rowRegex) || [];
 
   const streaks: TeamStreaks = { ...defaultStreaks };
+  
+  // Determina qual coluna usar baseado no escopo
+  // Colunas: [0] = Label, [1] = Casa, [2] = Fora, [3] = Global
+  const colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 3;
 
   for (const row of rows) {
-    const text = row.replace(/<[^>]+>/g, ' ').toLowerCase();
-    
-    if (text.includes('vitória') || text.includes('vitórias')) {
-      const match = text.match(/(\d+)/);
-      if (match) streaks.winStreak = parseInt(match[1]) || 0;
+    const cells: string[] = [];
+    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(row)) !== null) {
+      const cellContent = cellMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      cells.push(cellContent);
     }
-    if (text.includes('empate') || text.includes('empates')) {
-      const match = text.match(/(\d+)/);
-      if (match) streaks.drawStreak = parseInt(match[1]) || 0;
-    }
-    if (text.includes('derrota') || text.includes('derrotas')) {
-      const match = text.match(/(\d+)/);
-      if (match) streaks.lossStreak = parseInt(match[1]) || 0;
-    }
-    if (text.includes('sem perder')) {
-      const match = text.match(/(\d+)/);
-      if (match) streaks.unbeatenStreak = parseInt(match[1]) || 0;
-    }
-    if (text.includes('sem vencer')) {
-      const match = text.match(/(\d+)/);
-      if (match) streaks.winlessStreak = parseInt(match[1]) || 0;
-    }
-    if (text.includes('sem empatar')) {
-      const match = text.match(/(\d+)/);
-      if (match) streaks.noDrawStreak = parseInt(match[1]) || 0;
+
+    if (cells.length > colIndex) {
+      const label = (cells[0] || '').toLowerCase();
+      const value = cells[colIndex] || '-';
+      const numValue = value === '-' ? 0 : parseInt(value) || 0;
+      
+      if (label.includes('vitória') && label.includes('corrente')) {
+        streaks.winStreak = numValue;
+      } else if (label.includes('empate') && label.includes('corrente')) {
+        streaks.drawStreak = numValue;
+      } else if (label.includes('derrota') && label.includes('corrente')) {
+        streaks.lossStreak = numValue;
+      } else if (label.includes('sem perder')) {
+        streaks.unbeatenStreak = numValue;
+      } else if (label.includes('sem vencer')) {
+        streaks.winlessStreak = numValue;
+      } else if (label.includes('sem empatar')) {
+        streaks.noDrawStreak = numValue;
+      }
     }
   }
 
@@ -147,9 +230,12 @@ function extractStreaks(html: string, teamName: string): TeamStreaks {
 function extractOpponentAnalysis(html: string, teamName: string): OpponentAnalysisMatch[] {
   const analysis: OpponentAnalysisMatch[] = [];
 
+  // Encontra o nome exato do time no HTML
+  const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
+  
   // Procura pela seção "Análise classificativa"
   const analysisRegex = new RegExp(
-    `Análise classificativa[\\s\\S]*?${teamName}[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+    `Análise classificativa[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
     'i'
   );
 
@@ -161,32 +247,56 @@ function extractOpponentAnalysis(html: string, teamName: string): OpponentAnalys
   const rows = tableHtml.match(rowRegex) || [];
 
   for (const row of rows) {
+    // Pula linhas vazias
+    if (row.trim().match(/^<tr[^>]*>[\s&nbsp;]*<\/tr>$/i)) continue;
+    
     const cells: string[] = [];
     const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
     let cellMatch;
     while ((cellMatch = cellRegex.exec(row)) !== null) {
-      const cellContent = cellMatch[1]
-        .replace(/<[^>]+>/g, '')
+      let cellContent = cellMatch[1]
+        .replace(/<[^>]+>/g, ' ')
         .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
         .trim();
+      
+      // Extrai texto de links
+      const linkMatch = cellContent.match(/<a[^>]*>([^<]+)<\/a>/);
+      if (linkMatch) {
+        cellContent = linkMatch[1].trim();
+      }
+      
       cells.push(cellContent);
     }
 
     if (cells.length >= 6) {
-      const rankText = cells[0].replace(/[^\d]/g, '');
+      const rankText = (cells[0] || '').replace(/[^\d]/g, '');
       const opponentRank = rankText ? parseInt(rankText) : 0;
-      const homeTeam = cells[1] || '';
-      const score = cells[2] || '0-0';
-      const awayTeam = cells[3] || '';
-      const awayRank = cells[4] || '';
-      const firstGoal = cells[5] || '-';
+      const homeTeam = (cells[1] || '').trim();
+      const scoreText = (cells[2] || '0-0').trim();
+      const awayTeam = (cells[3] || '').trim();
+      const awayRankText = (cells[4] || '').replace(/[^\d]/g, '');
+      const firstGoal = (cells[5] || '-').trim();
 
-      // Determina resultado
-      const [homeScore, awayScore] = score.split(':').map(s => parseInt(s.trim()) || 0);
+      // Pula se não tiver times válidos
+      if (!homeTeam && !awayTeam) continue;
+      
+      // Extrai placar (pode estar em link)
+      const scoreMatch = scoreText.match(/(\d+)[-:](\d+)/);
+      if (!scoreMatch) continue;
+      
+      const homeScore = parseInt(scoreMatch[1]) || 0;
+      const awayScore = parseInt(scoreMatch[2]) || 0;
+
+      // Determina resultado baseado no time atual
       let result: 'V' | 'E' | 'D' = 'E';
-      if (homeTeam === teamName) {
+      const normalizedHomeTeam = normalizeTeamName(homeTeam);
+      const normalizedAwayTeam = normalizeTeamName(awayTeam);
+      const normalizedTeamName = normalizeTeamName(actualTeamName);
+      
+      if (normalizedHomeTeam === normalizedTeamName) {
         result = homeScore > awayScore ? 'V' : homeScore < awayScore ? 'D' : 'E';
-      } else if (awayTeam === teamName) {
+      } else if (normalizedAwayTeam === normalizedTeamName) {
         result = awayScore > homeScore ? 'V' : awayScore < homeScore ? 'D' : 'E';
       }
 
@@ -318,10 +428,30 @@ export default async function handler(
       const teamAForm = extractLast10Matches(html, matchInfo.teamA);
       const teamBForm = extractLast10Matches(html, matchInfo.teamB);
       const h2hData = extractH2HMatches(html);
-      const teamAStreaks = extractStreaks(html, matchInfo.teamA);
-      const teamBStreaks = extractStreaks(html, matchInfo.teamB);
+      
+      // Extrai streaks para cada escopo
+      const teamAStreaksHome = extractStreaks(html, matchInfo.teamA, 'home');
+      const teamAStreaksAway = extractStreaks(html, matchInfo.teamA, 'away');
+      const teamAStreaksGlobal = extractStreaks(html, matchInfo.teamA, 'global');
+      const teamBStreaksHome = extractStreaks(html, matchInfo.teamB, 'home');
+      const teamBStreaksAway = extractStreaks(html, matchInfo.teamB, 'away');
+      const teamBStreaksGlobal = extractStreaks(html, matchInfo.teamB, 'global');
+      
       const teamAOpponentAnalysis = extractOpponentAnalysis(html, matchInfo.teamA);
       const teamBOpponentAnalysis = extractOpponentAnalysis(html, matchInfo.teamB);
+
+      // Logs de debug
+      console.log('Extração de dados:', {
+        teamA: matchInfo.teamA,
+        teamB: matchInfo.teamB,
+        teamAFormCount: teamAForm.length,
+        teamBFormCount: teamBForm.length,
+        h2hCount: h2hData.length,
+        teamAStreaksHome,
+        teamBStreaksAway,
+        teamAAnalysisCount: teamAOpponentAnalysis.length,
+        teamBAnalysisCount: teamBOpponentAnalysis.length
+      });
 
       // Retorna os dados extraídos
       return res.status(200).json({
@@ -332,14 +462,14 @@ export default async function handler(
           teamBForm,
           h2hData,
           teamAStreaks: {
-            home: teamAStreaks,
-            away: teamAStreaks, // Placeholder - seria necessário mais parsing
-            global: teamAStreaks
+            home: teamAStreaksHome,
+            away: teamAStreaksAway,
+            global: teamAStreaksGlobal
           },
           teamBStreaks: {
-            home: teamBStreaks,
-            away: teamBStreaks,
-            global: teamBStreaks
+            home: teamBStreaksHome,
+            away: teamBStreaksAway,
+            global: teamBStreaksGlobal
           },
           teamAOpponentAnalysis: {
             home: teamAOpponentAnalysis,
@@ -352,7 +482,14 @@ export default async function handler(
             global: teamBOpponentAnalysis
           }
         },
-        message: 'Detalhes da partida processados com sucesso'
+        message: 'Detalhes da partida processados com sucesso',
+        debug: {
+          teamAFormCount: teamAForm.length,
+          teamBFormCount: teamBForm.length,
+          h2hCount: h2hData.length,
+          teamAAnalysisCount: teamAOpponentAnalysis.length,
+          teamBAnalysisCount: teamBOpponentAnalysis.length
+        }
       });
     } catch (error) {
       console.error('Erro ao processar detalhes:', error);
