@@ -54,13 +54,27 @@ function findTeamNameInHTML(html: string, searchName: string): string | null {
     searchName.replace(/-/g, ''),
     searchName.replace(/MG/g, 'Mineiro'),
     searchName.replace(/Mineiro/g, 'MG'),
+    searchName.replace(/Atlético/gi, 'Atletico'),
+    searchName.replace(/Atletico/gi, 'Atlético'),
   ];
   
+  // Primeiro tenta match exato ou parcial
   for (const variation of variations) {
-    const regex = new RegExp(`<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]*${variation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*)</span>`, 'i');
+    const escaped = variation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]*${escaped}[^<]*)</span>`, 'i');
     const match = html.match(regex);
     if (match && match[1]) {
       return match[1].trim();
+    }
+  }
+  
+  // Se não encontrou, tenta match normalizado (sem acentos, espaços, etc)
+  const allSubtitles = html.matchAll(/<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>/gi);
+  for (const match of allSubtitles) {
+    const foundName = match[1].trim();
+    const foundNormalized = normalizeTeamName(foundName);
+    if (foundNormalized === normalized || foundNormalized.includes(normalized) || normalized.includes(foundNormalized)) {
+      return foundName;
     }
   }
   
@@ -171,13 +185,37 @@ function extractStreaks(html: string, teamName: string, scope: 'home' | 'away' |
   const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
   
   // Procura pela seção de sequências do time específico
-  const teamSectionRegex = new RegExp(
-    `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\\s\\S]*?)</table>`,
-    'i'
-  );
-
-  const match = html.match(teamSectionRegex);
-  if (!match) return defaultStreaks;
+  // Tenta múltiplas estratégias
+  let match: RegExpMatchArray | null = null;
+  
+  // Estratégia 1: Busca com nome encontrado
+  if (actualTeamName) {
+    const escaped = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const teamSectionRegex = new RegExp(
+      `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${escaped}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+      'i'
+    );
+    match = html.match(teamSectionRegex);
+  }
+  
+  // Estratégia 2: Busca todas as tabelas stat-seqs e identifica qual é do time
+  if (!match) {
+    const allSeqsTables = html.matchAll(/<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\s\S]*?)<\/table>/gi);
+    for (const seqMatch of allSeqsTables) {
+      const foundTeamName = seqMatch[1].trim();
+      const foundNormalized = normalizeTeamName(foundTeamName);
+      const searchNormalized = normalizeTeamName(teamName);
+      
+      if (foundNormalized === searchNormalized || 
+          foundNormalized.includes(searchNormalized) || 
+          searchNormalized.includes(foundNormalized)) {
+        match = seqMatch;
+        break;
+      }
+    }
+  }
+  
+  if (!match || !match[match.length - 1]) return defaultStreaks;
 
   const tableHtml = match[1];
   
@@ -254,26 +292,48 @@ function extractOpponentAnalysis(html: string, teamName: string, context: 'home'
   }
   
   // Para contexto home/away, procura primeiro na seção "Análise classificativa"
-  const analysisRegex = new RegExp(
-    `Análise classificativa[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
-    'i'
-  );
-
-  let match = html.match(analysisRegex);
+  let match: RegExpMatchArray | null = null;
+  
+  if (actualTeamName) {
+    const escaped = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const analysisRegex = new RegExp(
+      `Análise classificativa[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${escaped}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+      'i'
+    );
+    match = html.match(analysisRegex);
+  }
   
   // Se não encontrar na análise classificativa, tenta na seção "Todos os jogos na condição Casa/Fora"
-  if (!match) {
+  if (!match && actualTeamName) {
+    const escaped = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const allMatchesRegex = new RegExp(
-      `Todos os jogos na condição Casa/Fora[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
+      `Todos os jogos na condição Casa/Fora[\\s\\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${escaped}[^<]*</span>[\\s\\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\\s\\S]*?)</table>`,
       'i'
     );
     match = html.match(allMatchesRegex);
   }
   
-  if (!match) return analysis;
+  // Estratégia 3: Busca todas as tabelas e identifica qual é do time
+  if (!match) {
+    const searchNormalized = normalizeTeamName(teamName);
+    const allAnalysisTables = html.matchAll(/(?:Análise classificativa|Todos os jogos na condição Casa\/Fora)[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi);
+    for (const analysisMatch of allAnalysisTables) {
+      const foundTeamName = analysisMatch[1].trim();
+      const foundNormalized = normalizeTeamName(foundTeamName);
+      
+      if (foundNormalized === searchNormalized || 
+          foundNormalized.includes(searchNormalized) || 
+          searchNormalized.includes(foundNormalized)) {
+        match = analysisMatch;
+        break;
+      }
+    }
+  }
+  
+  if (!match || !match[match.length - 1]) return analysis;
   
   // Extrai apenas jogos do contexto específico (Casa ou Fora)
-  return extractAnalysisFromTable(match[1], actualTeamName, context);
+  return extractAnalysisFromTable(match[match.length - 1], actualTeamName, context);
 }
 
 // Função auxiliar para extrair análise de uma tabela
