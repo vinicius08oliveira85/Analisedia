@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { updateMatchesFromHTML, uploadMatchesFile, type UpdateMatchesResponse } from '../services/matchesService';
+import { updateMatchesFromHTML, uploadMatchesFile, refreshMatchesAutomatically, type UpdateMatchesResponse } from '../services/matchesService';
 import type { MatchDetails } from '../types';
 
 interface UpdateMatchesProps {
@@ -35,6 +35,30 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated }
     }
   };
 
+  const handleAutomaticUpdate = async () => {
+    setIsUpdating(true);
+    setMessage(null);
+
+    try {
+      const result: UpdateMatchesResponse = await refreshMatchesAutomatically();
+      const metaInfo = [
+        result.matchDay ? `dia ${result.matchDay}` : null,
+        result.source ? `fonte ${result.source}` : null,
+      ].filter(Boolean).join(' • ');
+
+      setMessage({ 
+        type: 'success', 
+        text: metaInfo ? `${result.message} (${metaInfo})` : result.message 
+      });
+      onMatchesUpdated(result.matches);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao atualizar jogos automaticamente';
+      setMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handlePasteHTML = async () => {
     try {
       const html = await navigator.clipboard.readText();
@@ -55,50 +79,57 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated }
     } finally {
       setIsUpdating(false);
     }
-  };
+    };
 
-  return (
-    <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Atualizar Jogos do Dia</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={handlePasteHTML}
-            disabled={isUpdating}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
-          >
-            {isUpdating ? 'Processando...' : 'Colar HTML da Área de Transferência'}
-          </button>
-          <label className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors cursor-pointer">
-            {isUpdating ? 'Processando...' : 'Upload de Arquivo'}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".txt,.html"
-              onChange={handleFileUpload}
+    return (
+      <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">Atualizar Jogos do Dia</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={handleAutomaticUpdate}
               disabled={isUpdating}
-              className="hidden"
-            />
-          </label>
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            >
+              {isUpdating ? 'Sincronizando...' : 'Atualização Automática'}
+            </button>
+            <button
+              onClick={handlePasteHTML}
+              disabled={isUpdating}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            >
+              {isUpdating ? 'Processando...' : 'Colar HTML da Área de Transferência'}
+            </button>
+            <label className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors cursor-pointer">
+              {isUpdating ? 'Processando...' : 'Upload de Arquivo'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.html"
+                onChange={handleFileUpload}
+                disabled={isUpdating}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
+
+        {message && (
+          <div
+            className={`p-3 rounded-md ${
+              message.type === 'success'
+                ? 'bg-green-900/50 border border-green-700 text-green-200'
+                : 'bg-red-900/50 border border-red-700 text-red-200'
+            }`}
+          >
+            <p className="text-sm">{message.text}</p>
+          </div>
+        )}
+
+        <p className="text-gray-400 text-sm mt-3">
+          💡 <strong>Dica:</strong> Cole o HTML da página "Academia Jogos Do Dia" ou faça upload do arquivo .txt
+        </p>
       </div>
-
-      {message && (
-        <div
-          className={`p-3 rounded-md ${
-            message.type === 'success'
-              ? 'bg-green-900/50 border border-green-700 text-green-200'
-              : 'bg-red-900/50 border border-red-700 text-red-200'
-          }`}
-        >
-          <p className="text-sm">{message.text}</p>
-        </div>
-      )}
-
-      <p className="text-gray-400 text-sm mt-3">
-        💡 <strong>Dica:</strong> Cole o HTML da página "Academia Jogos Do Dia" ou faça upload do arquivo .txt
-      </p>
-    </div>
-  );
+    );
 };
 

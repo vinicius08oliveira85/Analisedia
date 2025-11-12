@@ -7,6 +7,10 @@ export interface UpdateMatchesResponse {
   count: number;
   matches: MatchDetails[];
   message: string;
+  matchDay?: string | null;
+  source?: string | null;
+  lastUpdated?: string | null;
+  syncedAt?: string | null;
 }
 
 /**
@@ -38,7 +42,7 @@ export async function updateMatchesFromHTML(html: string): Promise<UpdateMatches
 /**
  * Busca os jogos atualizados da API
  */
-export async function fetchMatches(): Promise<MatchDetails[]> {
+export async function fetchMatches(): Promise<UpdateMatchesResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/matches`, {
       method: 'GET',
@@ -51,8 +55,8 @@ export async function fetchMatches(): Promise<MatchDetails[]> {
       throw new Error(`Erro HTTP: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data.matches || [];
+    const data: UpdateMatchesResponse = await response.json();
+    return data;
   } catch (error) {
     console.error('Erro ao buscar jogos:', error);
     throw error;
@@ -82,5 +86,34 @@ export async function uploadMatchesFile(file: File): Promise<UpdateMatchesRespon
     
     reader.readAsText(file);
   });
+}
+
+/**
+ * Solicita atualização automática usando a fonte configurada no backend
+ */
+export async function refreshMatchesAutomatically(sourceUrl?: string): Promise<UpdateMatchesResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/matches`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sourceUrl,
+        refresh: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+      throw new Error(errorData.error || `Erro HTTP: ${response.status}`);
+    }
+
+    const data: UpdateMatchesResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erro ao atualizar jogos automaticamente:', error);
+    throw error;
+  }
 }
 

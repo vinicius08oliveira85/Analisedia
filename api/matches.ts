@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { MatchDetails } from '../types';
 
 interface SportsEvent {
@@ -29,6 +30,144 @@ interface SportsEvent {
 interface SchemaData {
   '@context': string;
   '@graph': SportsEvent[];
+}
+
+class SupabaseConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SupabaseConfigError';
+  }
+}
+
+const SUPABASE_TABLE = process.env.SUPABASE_MATCHES_TABLE || 'daily_matches';
+const DEFAULT_SOURCE_URL = process.env.DAILY_MATCHES_SOURCE_URL;
+
+type SupabaseMatchRow = {
+  match_id: string;
+  match_day: string | null;
+  kickoff: string | null;
+  data: MatchDetails;
+  source_url?: string | null;
+  updated_at?: string | null;
+};
+
+interface PersistableMatch {
+  match: MatchDetails;
+  kickoff: string | null;
+}
+
+let supabaseClient: SupabaseClient | null = null;
+
+function getSupabaseClient(): SupabaseClient {
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new SupabaseConfigError(
+      'Supabase não configurado. Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY (ou SUPABASE_ANON_KEY).'
+    );
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false }
+  });
+  return supabaseClient;
+}
+
+function inferMatchDay(matches: PersistableMatch[]): string | null {
+  for (const entry of matches) {
+    if (entry.kickoff) {
+      const iso = new Date(entry.kickoff).toISOString();
+      return iso.split('T')[0];
+    }
+  }
+  return null;
+}
+
+async function saveMatchesToSupabase(matches: PersistableMatch[], sourceUrl: string | null) {
+  if (matches.length === 0) return;
+
+  const supabase = getSupabaseClient();
+  const now = new Date().toISOString();
+
+  const payload = matches.map(({ match, kickoff }) => {
+    let kickoffIso: string | null = null;
+    let matchDay: string | null = null;
+
+    if (kickoff) {
+      const date = new Date(kickoff);
+      if (!Number.isNaN(date.getTime())) {
+        kickoffIso = date.toISOString();
+        matchDay = kickoffIso.split('T')[0];
+      }
+    }
+
+    return {
+      match_id: match.id,
+      kickoff: kickoffIso,
+      match_day: matchDay,
+      data: match,
+      source_url: sourceUrl,
+      updated_at: now
+    };
+  });
+
+  const { error } = await supabase
+    .from(SUPABASE_TABLE)
+    .upsert(payload, { onConflict: 'match_id' });
+
+  if (error) {
+    throw new Error(`Erro ao salvar jogos no Supabase: ${error.message}`);
+  }
+}
+
+async function fetchMatchesFromSupabase(matchDay?: string | null) {
+  const supabase = getSupabaseClient();
+
+  let query = supabase
+    .from<SupabaseMatchRow>(SUPABASE_TABLE)
+    .select('match_id, match_day, kickoff, data, source_url, updated_at')
+    .order('kickoff', { ascending: true, nullsFirst: false });
+
+  if (matchDay) {
+    query = query.eq('match_day', matchDay);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`Erro ao buscar jogos no Supabase: ${error.message}`);
+  }
+
+  if (!data) {
+    return {
+      matches: [] as MatchDetails[],
+      matchDay: matchDay ?? null,
+      lastUpdated: null as string | null,
+      source: null as string | null
+    };
+  }
+
+  const matches = data.map(item => item.data);
+  const computedMatchDay = matchDay ?? data.find(item => item.match_day)?.match_day ?? null;
+  const source =
+    data.find(item => item.source_url && item.source_url.length > 0)?.source_url ?? null;
+  const lastUpdatedTimestamp = data.reduce((latest, item) => {
+    if (!item.updated_at) return latest;
+    const ts = new Date(item.updated_at).getTime();
+    return ts > latest ? ts : latest;
+  }, 0);
+
+  return {
+    matches,
+    matchDay: computedMatchDay,
+    lastUpdated: lastUpdatedTimestamp ? new Date(lastUpdatedTimestamp).toISOString() : null,
+    source
+  };
 }
 
 // Função para extrair dados JSON do HTML
@@ -358,13 +497,30 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      // Retorna os jogos processados
-      // Em produção, você pode salvar em um banco de dados ou cache
-      return res.status(200).json({ 
-        message: 'Use POST para atualizar os jogos com dados HTML',
-        endpoint: '/api/matches'
+      const dateParam = Array.isArray(req.query?.date) ? req.query?.date[0] : req.query?.date;
+      const matchDayParam = typeof dateParam === 'string' && dateParam.trim().length > 0
+        ? dateParam.trim()
+        : null;
+      const todayIso = new Date().toISOString().split('T')[0];
+      const targetMatchDay = matchDayParam ?? todayIso;
+
+      const { matches, matchDay, lastUpdated, source } = await fetchMatchesFromSupabase(targetMatchDay);
+
+      return res.status(200).json({
+        success: true,
+        count: matches.length,
+        matches,
+        matchDay,
+        lastUpdated,
+        source,
+        message: matches.length > 0
+          ? `${matches.length} jogos encontrados para ${matchDay ?? 'a data solicitada'}`
+          : 'Nenhum jogo encontrado no Supabase para a data solicitada'
       });
     } catch (error) {
+      if (error instanceof SupabaseConfigError) {
+        return res.status(503).json({ error: error.message });
+      }
       console.error('Erro ao buscar jogos:', error);
       return res.status(500).json({ error: 'Erro ao buscar jogos' });
     }
@@ -372,59 +528,103 @@ export default async function handler(
 
   if (req.method === 'POST') {
     try {
-      const { html } = req.body;
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
+      const htmlFromBody = body?.html;
+      const sourceFromBody = typeof body?.sourceUrl === 'string' ? body.sourceUrl : null;
+      const shouldForceRefresh = body?.refresh === true || body?.refresh === 'true';
 
-      if (!html || typeof html !== 'string') {
-        return res.status(400).json({ 
-          error: 'É necessário fornecer o HTML no body: { "html": "..." }' 
+      let resolvedSourceUrl = sourceFromBody || DEFAULT_SOURCE_URL || null;
+      let htmlToProcess: string | null = typeof htmlFromBody === 'string' ? htmlFromBody : null;
+
+      if (htmlFromBody && typeof htmlFromBody !== 'string') {
+        return res.status(400).json({
+          error: 'O campo "html" precisa ser uma string contendo o HTML da página.'
         });
       }
 
-      console.log('HTML recebido, tamanho:', html.length);
-      
-      // Extrai os eventos do HTML
-      const events = extractMatchesFromHTML(html);
-      
-      console.log('Eventos extraídos:', events.length);
-      
+      if (!htmlToProcess) {
+        if (!resolvedSourceUrl) {
+          return res.status(400).json({
+            error: 'Nenhum HTML fornecido. Informe "html" no body ou configure DAILY_MATCHES_SOURCE_URL.'
+          });
+        }
+
+        console.log(`[matches] Buscando HTML automaticamente de ${resolvedSourceUrl}`);
+        const response = await fetch(resolvedSourceUrl);
+
+        if (!response.ok) {
+          return res.status(response.status).json({
+            error: `Não foi possível obter o HTML da fonte (${response.status} - ${response.statusText}).`,
+            source: resolvedSourceUrl
+          });
+        }
+
+        htmlToProcess = await response.text();
+      } else if (shouldForceRefresh && resolvedSourceUrl) {
+        console.log(
+          '[matches] Atualização forçada ativada; HTML fornecido manualmente, mas origem registrada como',
+          resolvedSourceUrl
+        );
+      }
+
+      if (!htmlToProcess || htmlToProcess.trim().length === 0) {
+        return res.status(400).json({
+          error: 'HTML vazio recebido. Verifique a fonte informada.'
+        });
+      }
+
+      console.log('[matches] HTML recebido, tamanho:', htmlToProcess.length);
+
+      const events = extractMatchesFromHTML(htmlToProcess);
+      console.log('[matches] Eventos extraídos:', events.length);
+
       if (events.length === 0) {
-        // Tenta encontrar o motivo
-        const hasScript = html.includes('application/ld+json');
-        const hasSportsEvent = html.includes('SportsEvent');
-        const hasGraph = html.includes('@graph');
-        
-        return res.status(400).json({ 
+        const hasScript = htmlToProcess.includes('application/ld+json');
+        const hasSportsEvent = htmlToProcess.includes('SportsEvent');
+        const hasGraph = htmlToProcess.includes('@graph');
+
+        return res.status(400).json({
           error: 'Nenhum jogo encontrado no HTML fornecido',
           debug: {
-            htmlLength: html.length,
-            hasScript: hasScript,
-            hasSportsEvent: hasSportsEvent,
-            hasGraph: hasGraph,
-            sample: html.substring(0, 500) // Primeiros 500 caracteres para debug
+            htmlLength: htmlToProcess.length,
+            hasScript,
+            hasSportsEvent,
+            hasGraph,
+            sample: htmlToProcess.substring(0, 500)
           }
         });
       }
 
-      // Converte para MatchDetails
-      const matches = events.map(convertToMatchDetails).filter(m => m.id) as MatchDetails[];
+      const processed = events
+        .map(event => ({
+          match: convertToMatchDetails(event),
+          kickoff: event.startDate ?? null
+        }))
+        .filter(entry => entry.match.id) as PersistableMatch[];
 
-      console.log('Matches convertidos:', matches.length);
+      const matches = processed.map(entry => entry.match);
+      console.log('[matches] Matches convertidos:', matches.length);
 
-      // Aqui você pode salvar no banco de dados (Supabase) se necessário
-      // Por enquanto, apenas retorna os dados processados
+      await saveMatchesToSupabase(processed, resolvedSourceUrl);
+      const matchDay = inferMatchDay(processed);
 
       return res.status(200).json({
         success: true,
         count: matches.length,
-        matches: matches,
-        message: `${matches.length} jogos processados com sucesso`
+        matches,
+        matchDay,
+        source: resolvedSourceUrl,
+        message: `${matches.length} jogos processados com sucesso`,
+        syncedAt: new Date().toISOString()
       });
     } catch (error) {
+      if (error instanceof SupabaseConfigError) {
+        return res.status(503).json({ error: error.message });
+      }
       console.error('Erro ao processar jogos:', error);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'Erro ao processar jogos',
-        details: error instanceof Error ? error.message : 'Erro desconhecido',
-        stack: error instanceof Error ? error.stack : undefined
+        details: error instanceof Error ? error.message : 'Erro desconhecido'
       });
     }
   }

@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { MatchList } from './components/MatchList';
 import { MatchDetail } from './components/MatchDetail';
 import { UpdateMatches } from './components/UpdateMatches';
+import { fetchMatches } from './services/matchesService';
 import { allMatchesData } from './data';
 import type { MatchDetails } from './types';
 
@@ -40,6 +41,36 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Could not load matches from localStorage", error);
     }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMatchesFromApi = async () => {
+      try {
+        const response = await fetchMatches();
+        if (!isMounted) {
+          return;
+        }
+
+        if (response.success && Array.isArray(response.matches) && response.matches.length > 0) {
+          setMatches(response.matches);
+          try {
+            window.localStorage.setItem('updatedMatches', JSON.stringify(response.matches));
+          } catch (error) {
+            console.error('Não foi possível salvar os jogos atualizados no localStorage', error);
+          }
+        }
+      } catch (error) {
+        console.error('Não foi possível carregar os jogos a partir da API', error);
+      }
+    };
+
+    loadMatchesFromApi();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleMatchesUpdated = (updatedMatches: MatchDetails[]) => {
