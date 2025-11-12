@@ -7,6 +7,7 @@ import { StandingsTab } from './StandingsTab';
 import { GoalAnalysisTab } from './GoalAnalysisTab';
 import { GeminiAnalysis } from './GeminiAnalysis';
 import { ProbabilityAnalysisTab } from './ProbabilityAnalysisTab';
+import { UpdateMatchDetails } from './UpdateMatchDetails';
 import type { MatchDetails, Tab } from '../types';
 
 interface MatchDetailProps {
@@ -17,50 +18,55 @@ interface MatchDetailProps {
 }
 
 export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavorite, onToggleFavorite }) => {
+  const [currentMatch, setCurrentMatch] = useState<MatchDetails>(match);
   const [activeTab, setActiveTab] = useState<Tab>('Visão Geral');
+
+  const handleDetailsUpdated = (updatedMatch: MatchDetails) => {
+    setCurrentMatch(updatedMatch);
+  };
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 'Visão Geral':
         return <OverviewTab 
-                    teamA={match.teamA} 
-                    teamB={match.teamB} 
-                    teamAForm={match.teamAForm} 
-                    teamBForm={match.teamBForm}
-                    teamAStreaks={match.teamAStreaks}
-                    teamBStreaks={match.teamBStreaks}
-                    teamAOpponentAnalysis={match.teamAOpponentAnalysis}
-                    teamBOpponentAnalysis={match.teamBOpponentAnalysis}
+                    teamA={currentMatch.teamA} 
+                    teamB={currentMatch.teamB} 
+                    teamAForm={currentMatch.teamAForm} 
+                    teamBForm={currentMatch.teamBForm}
+                    teamAStreaks={currentMatch.teamAStreaks}
+                    teamBStreaks={currentMatch.teamBStreaks}
+                    teamAOpponentAnalysis={currentMatch.teamAOpponentAnalysis}
+                    teamBOpponentAnalysis={currentMatch.teamBOpponentAnalysis}
                 />;
       case 'Análise com IA':
-        return <GeminiAnalysis match={match} />;
+        return <GeminiAnalysis match={currentMatch} />;
       case 'Probabilidades':
-        return <ProbabilityAnalysisTab match={match} />;
+        return <ProbabilityAnalysisTab match={currentMatch} />;
       case 'Confronto Direto':
-        return <H2HTab h2hData={match.h2hData} />;
+        return <H2HTab h2hData={currentMatch.h2hData} />;
       case 'Classificação':
-        return <StandingsTab standingsData={match.standingsData} teamA={match.teamA} teamB={match.teamB} />;
+        return <StandingsTab standingsData={currentMatch.standingsData} teamA={currentMatch.teamA} teamB={currentMatch.teamB} />;
       case 'Análise de Gols':
         return <GoalAnalysisTab 
-                    teamAGoalStats={match.teamAGoalStats} 
-                    teamBGoalStats={match.teamBGoalStats} 
-                    teamA={match.teamA} 
-                    teamB={match.teamB}
-                    teamAGoalPatterns={match.teamAGoalPatterns}
-                    teamBGoalPatterns={match.teamBGoalPatterns}
-                    teamACorrectScores={match.teamACorrectScores}
-                    teamBCorrectScores={match.teamBCorrectScores}
+                    teamAGoalStats={currentMatch.teamAGoalStats} 
+                    teamBGoalStats={currentMatch.teamBGoalStats} 
+                    teamA={currentMatch.teamA} 
+                    teamB={currentMatch.teamB}
+                    teamAGoalPatterns={currentMatch.teamAGoalPatterns}
+                    teamBGoalPatterns={currentMatch.teamBGoalPatterns}
+                    teamACorrectScores={currentMatch.teamACorrectScores}
+                    teamBCorrectScores={currentMatch.teamBCorrectScores}
                 />;
       default:
         return <OverviewTab 
-                    teamA={match.teamA} 
-                    teamB={match.teamB} 
-                    teamAForm={match.teamAForm} 
-                    teamBForm={match.teamBForm}
-                    teamAStreaks={match.teamAStreaks}
-                    teamBStreaks={match.teamBStreaks}
-                    teamAOpponentAnalysis={match.teamAOpponentAnalysis}
-                    teamBOpponentAnalysis={match.teamBOpponentAnalysis}
+                    teamA={currentMatch.teamA} 
+                    teamB={currentMatch.teamB} 
+                    teamAForm={currentMatch.teamAForm} 
+                    teamBForm={currentMatch.teamBForm}
+                    teamAStreaks={currentMatch.teamAStreaks}
+                    teamBStreaks={currentMatch.teamBStreaks}
+                    teamAOpponentAnalysis={currentMatch.teamAOpponentAnalysis}
+                    teamBOpponentAnalysis={currentMatch.teamBOpponentAnalysis}
                 />;
     }
   };
@@ -76,11 +82,12 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
             </svg>
             Voltar para a lista de jogos
         </button>
+        <UpdateMatchDetails match={currentMatch} onDetailsUpdated={handleDetailsUpdated} />
         <MatchHeader 
-          teamA={match.teamA} 
-          teamB={match.teamB} 
-          matchInfo={match.matchInfo} 
-          matchId={match.id}
+          teamA={currentMatch.teamA} 
+          teamB={currentMatch.teamB} 
+          matchInfo={currentMatch.matchInfo} 
+          matchId={currentMatch.id}
           isFavorite={isFavorite}
           onToggleFavorite={onToggleFavorite}
         />
