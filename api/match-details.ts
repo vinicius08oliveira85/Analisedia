@@ -91,15 +91,24 @@ function extractMatchesFromTable(tableHtml: string): Match[] {
 function extractAllFormTablesWithNames(html: string): Array<{ teamName: string; matches: Match[] }> {
   const results: Array<{ teamName: string; matches: Match[] }> = [];
   
-  // Busca todas as seções "Últimos 10 jogos" e extrai as tabelas com seus nomes
-  const sectionRegex = /Últimos 10 jogos[\s\S]*?<tr>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
+  // Busca todas as tabelas stat-last10 com seus subtitles (mais flexível)
+  // Procura por qualquer span stats-subtitle seguido de table stat-last10
+  const tableRegex = /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
   
   let match;
-  while ((match = sectionRegex.exec(html)) !== null) {
+  while ((match = tableRegex.exec(html)) !== null) {
     const teamName = match[1].trim();
     const tableHtml = match[2];
-    const matches = extractMatchesFromTable(tableHtml);
-    results.push({ teamName, matches });
+    
+    // Verifica se é uma tabela de form (tem colunas Data, Casa, Fora, etc)
+    if (tableHtml.includes('stats-wd-date') || tableHtml.includes('stats-wd-teamname')) {
+      const matches = extractMatchesFromTable(tableHtml);
+      // Evita duplicatas
+      const exists = results.some(r => normalizeTeamName(r.teamName) === normalizeTeamName(teamName));
+      if (!exists) {
+        results.push({ teamName, matches });
+      }
+    }
   }
   
   return results;
@@ -125,15 +134,24 @@ function findTableForTeam(tables: Array<{ teamName: string; matches: Match[] }>,
 function extractAllStreaksTablesWithNames(html: string): Array<{ teamName: string; streaks: ScopedStats<TeamStreaks> }> {
   const results: Array<{ teamName: string; streaks: ScopedStats<TeamStreaks> }> = [];
   
-  // Busca todas as tabelas stat-seqs com seus subtitles na seção "Últimos 10 jogos"
-  const sectionRegex = /Últimos 10 jogos[\s\S]*?<tr[^>]*class="[^"]*ajax-container[^"]*"[^>]*>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
+  // Busca todas as tabelas stat-seqs com seus subtitles (mais flexível)
+  // Procura por qualquer span stats-subtitle seguido de table stat-seqs
+  const tableRegex = /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
   
   let match;
-  while ((match = sectionRegex.exec(html)) !== null) {
+  while ((match = tableRegex.exec(html)) !== null) {
     const teamName = match[1].trim();
     const tableHtml = match[2];
-    const streaks = extractStreaksFromTable(tableHtml);
-    results.push({ teamName, streaks });
+    
+    // Verifica se é uma tabela de streaks (tem "Sequência de Vitórias" ou "Não perde há")
+    if (tableHtml.includes('Sequência de') || tableHtml.includes('Não perde') || tableHtml.includes('Não ganha') || tableHtml.includes('Não empata')) {
+      const streaks = extractStreaksFromTable(tableHtml);
+      // Evita duplicatas
+      const exists = results.some(r => normalizeTeamName(r.teamName) === normalizeTeamName(teamName));
+      if (!exists) {
+        results.push({ teamName, streaks });
+      }
+    }
   }
   
   return results;
@@ -314,6 +332,7 @@ function extractAllAnalysisTablesWithNames(html: string): Array<{ teamName: stri
   const results: Array<{ teamName: string; analysis: ScopedStats<OpponentAnalysisMatch[]> }> = [];
   
   // Busca seções de análise classificativa e "Todos os jogos na condição Casa/Fora"
+  // Procura primeiro pela seção, depois pelas tabelas dentro dela
   const sectionRegex = /(?:Análise classificativa|Todos os jogos na condição Casa\/Fora)[\s\S]*?<tr>[\s\S]*?<td[^>]*class="[^"]*mobile_single_column[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
   
   let match;
@@ -323,11 +342,32 @@ function extractAllAnalysisTablesWithNames(html: string): Array<{ teamName: stri
     const teamName = match[1].trim();
     const tableHtml = match[2];
     
-    if (!tablesByTeam[teamName]) {
-      tablesByTeam[teamName] = tableHtml;
-    } else {
-      // Se já existe, concatena (pode ter múltiplas seções)
-      tablesByTeam[teamName] += '\n' + tableHtml;
+    // Verifica se é uma tabela de análise (tem colunas de ranking, placar, etc)
+    if (tableHtml.includes('stat-quart-') || tableHtml.includes('stats-wd-ranking')) {
+      if (!tablesByTeam[teamName]) {
+        tablesByTeam[teamName] = tableHtml;
+      } else {
+        // Se já existe, concatena (pode ter múltiplas seções)
+        tablesByTeam[teamName] += '\n' + tableHtml;
+      }
+    }
+  }
+  
+  // Se não encontrou nada nas seções específicas, busca diretamente por tabelas stat-last10 com stat-quart
+  if (Object.keys(tablesByTeam).length === 0) {
+    const directRegex = /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
+    while ((match = directRegex.exec(html)) !== null) {
+      const teamName = match[1].trim();
+      const tableHtml = match[2];
+      
+      // Verifica se é uma tabela de análise (tem stat-quart ou ranking)
+      if (tableHtml.includes('stat-quart-') || tableHtml.includes('stats-wd-ranking')) {
+        if (!tablesByTeam[teamName]) {
+          tablesByTeam[teamName] = tableHtml;
+        } else {
+          tablesByTeam[teamName] += '\n' + tableHtml;
+        }
+      }
     }
   }
   
