@@ -202,16 +202,35 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
         <label className="block text-sm font-medium text-gray-300 mb-2">
           URL da página de competição/liga (opcional - para buscar estatísticas):
         </label>
-        <input
-          type="text"
-          value={competitionUrl}
-          onChange={(e) => setCompetitionUrl(e.target.value)}
-          placeholder="https://www.academiadasapostasbrasil.com/stats/competition/..."
-          disabled={isUpdating}
-          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-600 disabled:cursor-not-allowed"
-        />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={competitionUrl}
+            onChange={(e) => setCompetitionUrl(e.target.value)}
+            placeholder="https://www.academiadasapostasbrasil.com/stats/competition/..."
+            disabled={isUpdating}
+            className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-600 disabled:cursor-not-allowed"
+          />
+          <button
+            onClick={() => {
+              const league = findLeagueForCompetition(match.matchInfo.competition);
+              if (league && league.competitionUrl) {
+                setCompetitionUrl(league.competitionUrl);
+                setMessage({ type: 'success', text: `URL da liga "${league.name}" preenchida automaticamente!` });
+              } else {
+                setMessage({ type: 'error', text: 'Nenhuma liga cadastrada para esta competição. Cadastre uma liga na aba "Ligas".' });
+              }
+            }}
+            disabled={isUpdating}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+            title="Buscar URL da liga cadastrada"
+          >
+            🔗 Usar Liga
+          </button>
+        </div>
         <p className="text-gray-400 text-xs mt-1">
-          Se os dados de gols não forem encontrados na página de detalhes, o sistema buscará automaticamente na página de competição.
+          Se os dados de gols não forem encontrados na página de detalhes, o sistema buscará automaticamente na página de competição. 
+          Use o botão "Usar Liga" para preencher automaticamente se você cadastrou a liga na aba "Ligas".
         </p>
       </div>
 
