@@ -1141,62 +1141,85 @@ function extractGoalStatsDirectly(html: string, teamName: string, scope: 'home' 
     
     console.log(`[extractGoalStatsDirectly] Analisando seção ${i + 1} (${section.length} chars)`);
     
-    // Padrões mais flexíveis - busca números próximos a textos específicos
+    // Padrões ULTRA flexíveis - busca números em qualquer lugar próximo a textos específicos
+    // Remove tags HTML temporariamente para facilitar busca
+    const cleanSection = section.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    
     const patterns = [
-      // Média gols marcados
+      // Média gols marcados - padrões muito flexíveis
       {
         key: 'avgGoalsScored',
         patterns: [
-          /média[^<]*gols[^<]*marcados[^<]{0,200}([\d,]+)/i,
-          /média[^<]*gols[^<]*marcados[^<]{0,200}casa[^<]{0,200}([\d,]+)/i,
-          /média[^<]*gols[^<]*marcados[^<]{0,200}fora[^<]{0,200}([\d,]+)/i,
-          new RegExp(`${escapedName}[^<]{0,500}média[^<]{0,200}gols[^<]{0,200}marcados[^<]{0,200}([\\d,]+)`, 'i'),
+          /média[^0-9]*gols[^0-9]*marcados[^0-9]*([\d,]+)/i,
+          /média[^0-9]*gols[^0-9]*marcados[^0-9]*casa[^0-9]*([\d,]+)/i,
+          /média[^0-9]*gols[^0-9]*marcados[^0-9]*fora[^0-9]*([\d,]+)/i,
+          new RegExp(`${escapedName}[^0-9]{0,1000}média[^0-9]{0,500}gols[^0-9]{0,500}marcados[^0-9]{0,500}([\\d,]+)`, 'i'),
+          // Padrão reverso: número antes do texto
+          /([\d,]+)[^a-z]*média[^a-z]*gols[^a-z]*marcados/i,
         ]
       },
-      // Média gols sofridos
+      // Média gols sofridos - padrões muito flexíveis
       {
         key: 'avgGoalsConceded',
         patterns: [
-          /média[^<]*gols[^<]*sofridos[^<]{0,200}([\d,]+)/i,
-          /média[^<]*gols[^<]*sofridos[^<]{0,200}casa[^<]{0,200}([\d,]+)/i,
-          /média[^<]*gols[^<]*sofridos[^<]{0,200}fora[^<]{0,200}([\d,]+)/i,
-          new RegExp(`${escapedName}[^<]{0,500}média[^<]{0,200}gols[^<]{0,200}sofridos[^<]{0,200}([\\d,]+)`, 'i'),
+          /média[^0-9]*gols[^0-9]*sofridos[^0-9]*([\d,]+)/i,
+          /média[^0-9]*gols[^0-9]*sofridos[^0-9]*casa[^0-9]*([\d,]+)/i,
+          /média[^0-9]*gols[^0-9]*sofridos[^0-9]*fora[^0-9]*([\d,]+)/i,
+          new RegExp(`${escapedName}[^0-9]{0,1000}média[^0-9]{0,500}gols[^0-9]{0,500}sofridos[^0-9]{0,500}([\\d,]+)`, 'i'),
+          // Padrão reverso: número antes do texto
+          /([\d,]+)[^a-z]*média[^a-z]*gols[^a-z]*sofridos/i,
         ]
       },
       // > 2.5
       {
         key: 'over25Pct',
         patterns: [
-          />[^<]*2[^<]*,?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
-          /mais[^<]*de[^<]*2[^<]*,?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
-          /over[^<]*2[^<]*\.?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
+          />[^0-9]*2[^0-9]*,?[^0-9]*5[^0-9]{0,200}([\d]+)[^0-9]*%/i,
+          /mais[^0-9]*de[^0-9]*2[^0-9]*,?[^0-9]*5[^0-9]{0,200}([\d]+)[^0-9]*%/i,
+          /over[^0-9]*2[^0-9]*\.?[^0-9]*5[^0-9]{0,200}([\d]+)[^0-9]*%/i,
         ]
       },
       // < 2.5
       {
         key: 'under25Pct',
         patterns: [
-          /<[^<]*2[^<]*,?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
-          /menos[^<]*de[^<]*2[^<]*,?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
-          /under[^<]*2[^<]*\.?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
+          /<[^0-9]*2[^0-9]*,?[^0-9]*5[^0-9]{0,200}([\d]+)[^0-9]*%/i,
+          /menos[^0-9]*de[^0-9]*2[^0-9]*,?[^0-9]*5[^0-9]{0,200}([\d]+)[^0-9]*%/i,
+          /under[^0-9]*2[^0-9]*\.?[^0-9]*5[^0-9]{0,200}([\d]+)[^0-9]*%/i,
         ]
       },
     ];
     
-    // Busca valores em cada padrão
+    console.log(`[extractGoalStatsDirectly] Seção limpa (primeiros 500 chars): ${cleanSection.substring(0, 500)}`);
+    
+    // Busca valores em cada padrão - tenta tanto na seção HTML quanto na limpa
     for (const { key, patterns: patternList } of patterns) {
       if ((defaultStats as any)[key] > 0) continue; // Já encontrou valor
       
       for (const pattern of patternList) {
-        const match = section.match(pattern);
+        // Tenta na seção HTML original
+        let match = section.match(pattern);
+        if (!match || !match[1]) {
+          // Se não encontrou, tenta na seção limpa (sem tags HTML)
+          match = cleanSection.match(pattern);
+        }
+        
         if (match && match[1]) {
           const value = parseNumericValue(match[1]);
           if (value > 0) {
             (defaultStats as any)[key] = value;
             console.log(`[extractGoalStatsDirectly] ✓✓✓ ${key}: ${value} (de "${match[1]}" na seção ${i + 1})`);
+            console.log(`[extractGoalStatsDirectly] Contexto do match: "${match[0].substring(0, 100)}"`);
             break;
+          } else {
+            console.log(`[extractGoalStatsDirectly] Match encontrado mas valor inválido: "${match[1]}" (parseado: ${value})`);
           }
         }
+      }
+      
+      // Se ainda não encontrou, log de debug
+      if ((defaultStats as any)[key] === 0) {
+        console.log(`[extractGoalStatsDirectly] ⚠ ${key} não encontrado na seção ${i + 1}`);
       }
     }
     
@@ -2174,6 +2197,15 @@ export default async function handler(
       
       console.log(`[Goal Stats] RESULTADO IMEDIATO Time A Home: Marcados=${teamAGoalStatsHome.avgGoalsScored}, Sofridos=${teamAGoalStatsHome.avgGoalsConceded}`);
       console.log(`[Goal Stats] RESULTADO IMEDIATO Time B Home: Marcados=${teamBGoalStatsHome.avgGoalsScored}, Sofridos=${teamBGoalStatsHome.avgGoalsConceded}`);
+      
+      // Validação crítica: se ambos estão zerados, há um problema sério
+      if (teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0 && 
+          teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0) {
+        console.error(`[Goal Stats] ⚠⚠⚠ ERRO CRÍTICO: Ambos os times têm valores zerados após busca direta!`);
+        console.error(`[Goal Stats] Isso indica que a busca direta não está funcionando. Verifique os logs acima.`);
+        console.error(`[Goal Stats] HTML tamanho: ${html.length} chars`);
+        console.error(`[Goal Stats] Time A: "${matchInfo.teamA}", Time B: "${matchInfo.teamB}"`);
+      }
       
       const teamAGoalStats = {
         home: teamAGoalStatsHome,
