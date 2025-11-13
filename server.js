@@ -68,23 +68,45 @@ function vercelWrapper(handler) {
 
 // Importa e registra as rotas da API
 async function setupApiRoutes() {
-  // Importa dinamicamente os handlers das APIs (TypeScript com tsx)
-  const matchDetailsHandler = (await import('./api/match-details.ts')).default;
-  const scrapeMatchesHandler = (await import('./api/scrape-matches.ts')).default;
-  const scrapeMatchDetailsHandler = (await import('./api/scrape-match-details.ts')).default;
-  const matchesHandler = (await import('./api/matches.ts')).default;
-  const liveStatusHandler = (await import('./api/live-status.ts')).default;
+  try {
+    console.log('📥 Importando handlers da API...');
+    
+    // Importa dinamicamente os handlers das APIs (TypeScript com tsx)
+    console.log('  - Importando match-details...');
+    const matchDetailsHandler = (await import('./api/match-details.ts')).default;
+    
+    console.log('  - Importando scrape-matches...');
+    const scrapeMatchesHandler = (await import('./api/scrape-matches.ts')).default;
+    
+    console.log('  - Importando scrape-match-details...');
+    const scrapeMatchDetailsHandler = (await import('./api/scrape-match-details.ts')).default;
+    
+    console.log('  - Importando matches...');
+    const matchesHandler = (await import('./api/matches.ts')).default;
+    
+    console.log('  - Importando live-status...');
+    const liveStatusHandler = (await import('./api/live-status.ts')).default;
+    
+    console.log('✅ Todos os handlers importados com sucesso');
 
-  // Registra as rotas da API com wrapper
-  app.post('/api/match-details', vercelWrapper(matchDetailsHandler));
-  app.get('/api/scrape-matches', vercelWrapper(scrapeMatchesHandler));
-  app.post('/api/scrape-matches', vercelWrapper(scrapeMatchesHandler));
-  app.get('/api/scrape-match-details', vercelWrapper(scrapeMatchDetailsHandler));
-  app.post('/api/scrape-match-details', vercelWrapper(scrapeMatchDetailsHandler));
-  app.get('/api/matches', vercelWrapper(matchesHandler));
-  app.post('/api/matches', vercelWrapper(matchesHandler));
-  app.get('/api/live-status', vercelWrapper(liveStatusHandler));
-  app.post('/api/live-status', vercelWrapper(liveStatusHandler));
+    // Registra as rotas da API com wrapper
+    console.log('🔗 Registrando rotas...');
+    app.post('/api/match-details', vercelWrapper(matchDetailsHandler));
+    app.get('/api/scrape-matches', vercelWrapper(scrapeMatchesHandler));
+    app.post('/api/scrape-matches', vercelWrapper(scrapeMatchesHandler));
+    app.get('/api/scrape-match-details', vercelWrapper(scrapeMatchDetailsHandler));
+    app.post('/api/scrape-match-details', vercelWrapper(scrapeMatchDetailsHandler));
+    app.get('/api/matches', vercelWrapper(matchesHandler));
+    app.post('/api/matches', vercelWrapper(matchesHandler));
+    app.get('/api/live-status', vercelWrapper(liveStatusHandler));
+    app.post('/api/live-status', vercelWrapper(liveStatusHandler));
+    
+    console.log('✅ Rotas registradas');
+  } catch (error) {
+    console.error('❌ Erro ao configurar rotas da API:', error);
+    console.error('Stack:', error.stack);
+    throw error;
+  }
 }
 
 // Serve arquivos estáticos do build do Vite
@@ -110,16 +132,37 @@ app.get('*', (req, res) => {
 // Inicia o servidor
 async function startServer() {
   try {
+    console.log('🔄 Iniciando servidor...');
+    console.log('📁 Diretório atual:', __dirname);
+    console.log('📦 Node version:', process.version);
+    
     await setupApiRoutes();
+    console.log('✅ Rotas da API configuradas');
+    
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📦 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🌐 Acesse: http://0.0.0.0:${PORT}`);
     });
   } catch (error) {
     console.error('❌ Erro ao iniciar servidor:', error);
+    console.error('Stack trace:', error.stack);
     process.exit(1);
   }
 }
+
+// Tratamento de erros não capturados
+process.on('uncaughtException', (error) => {
+  console.error('💥 Erro não capturado:', error);
+  console.error('Stack:', error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Promise rejeitada não tratada:', reason);
+  console.error('Promise:', promise);
+  process.exit(1);
+});
 
 startServer();
 

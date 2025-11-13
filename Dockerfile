@@ -14,11 +14,11 @@ COPY . .
 # Build do projeto (frontend)
 RUN npm run build
 
-# Instala tsx globalmente para executar TypeScript
-RUN npm install -g tsx
-
 # Expõe a porta
 EXPOSE 3000
+
+# Variável de ambiente para Node.js
+ENV NODE_ENV=production
 
 # Comando para iniciar o servidor (com tsx para executar TypeScript)
 CMD ["npx", "tsx", "server.js"]
