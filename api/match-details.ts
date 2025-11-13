@@ -1328,46 +1328,50 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
       
       console.log(`[extractGoalStats] Processando linha: "${label}" | Coluna ${colIndex} (${scope}): "${value}"`);
       
-      // Extrai valores numéricos
+      // Extrai valores numéricos - usa parseNumericValue que é mais robusto
       if (label.includes('média de gols marcados') || label.includes('média gols marcados')) {
-        const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        const numValue = parseNumericValue(value);
         if (numValue > 0) {
           defaultStats.avgGoalsScored = numValue;
           console.log(`[extractGoalStats] ✓✓✓ Média gols marcados (${scope}): ${numValue} (da célula ${colIndex}: "${value}")`);
+        } else {
+          console.log(`[extractGoalStats] ⚠ Valor inválido para média gols marcados: "${value}" (parseado: ${numValue})`);
         }
       } else if (label.includes('média de gols sofridos') || label.includes('média gols sofridos')) {
-        const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        const numValue = parseNumericValue(value);
         if (numValue > 0) {
           defaultStats.avgGoalsConceded = numValue;
           console.log(`[extractGoalStats] ✓✓✓ Média gols sofridos (${scope}): ${numValue} (da célula ${colIndex}: "${value}")`);
+        } else {
+          console.log(`[extractGoalStats] ⚠ Valor inválido para média gols sofridos: "${value}" (parseado: ${numValue})`);
         }
       } else if (label.includes('média de gols marcados+sofridos') || label.includes('média total')) {
-        const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+        const numValue = parseNumericValue(value);
         if (numValue > 0) {
           defaultStats.avgTotalGoals = numValue;
           console.log(`[extractGoalStats] ✓ Média total gols (${scope}): ${numValue}`);
         }
       } else if (label.includes('mais de 2,5') || label.includes('> 2,5') || label.includes('mais de 2.5')) {
         // Pode estar como "40%" ou "40"
-        const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
+        const numValue = parseIntegerValue(value);
         if (numValue > 0) {
           defaultStats.over25Pct = numValue;
           console.log(`[extractGoalStats] ✓ > 2.5 gols (${scope}): ${numValue}%`);
         }
       } else if (label.includes('menos de 2,5') || label.includes('< 2,5') || label.includes('menos de 2.5')) {
-        const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
+        const numValue = parseIntegerValue(value);
         if (numValue > 0) {
           defaultStats.under25Pct = numValue;
           console.log(`[extractGoalStats] ✓ < 2.5 gols (${scope}): ${numValue}%`);
         }
       } else if (label.includes('sem marcar') || label.includes('s/ marcar') || label.includes('sem marcar gols')) {
-        const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
+        const numValue = parseIntegerValue(value);
         if (numValue > 0) {
           defaultStats.noGoalsScoredPct = numValue;
           console.log(`[extractGoalStats] ✓ Jogos sem marcar (${scope}): ${numValue}%`);
         }
       } else if (label.includes('sem sofrer') || label.includes('s/ sofrer') || label.includes('sem sofrer gols')) {
-        const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
+        const numValue = parseIntegerValue(value);
         if (numValue > 0) {
           defaultStats.noGoalsConcededPct = numValue;
           console.log(`[extractGoalStats] ✓ Jogos sem sofrer (${scope}): ${numValue}%`);
