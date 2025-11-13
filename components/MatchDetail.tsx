@@ -112,12 +112,30 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
       case 'Ligas':
         return <LeaguesTab 
                     currentMatch={currentMatch}
-                    onLeagueSelected={(league) => {
-                      // Quando uma liga é selecionada, pode ser usado para buscar dados da competição
-                      console.log('Liga selecionada:', league);
-                      if (league.competitionUrl) {
-                        // Pode ser usado para atualizar a partida com dados da competição
-                        setMessage({ type: 'success', text: `Liga "${league.name}" selecionada. Use a URL da competição para buscar dados.` });
+                    onLeagueSelected={async (league) => {
+                      // Quando uma liga é selecionada, usa a URL da competição para buscar dados
+                      if (league.competitionUrl && currentMatch.matchInfo.url) {
+                        setMessage({ type: 'success', text: `Liga "${league.name}" selecionada. Buscando dados da competição...` });
+                        
+                        try {
+                          // Busca detalhes usando a URL da partida e a URL da competição
+                          const result = await scrapeMatchDetailsFromURL(
+                            currentMatch.matchInfo.url,
+                            currentMatch.id,
+                            league.competitionUrl
+                          );
+                          
+                          if (result.success && result.data) {
+                            const updatedMatch = applyMatchDetailsUpdate(currentMatch, result.data);
+                            setCurrentMatch(updatedMatch);
+                            setMessage({ type: 'success', text: `Dados da liga "${league.name}" sincronizados com sucesso!` });
+                          }
+                        } catch (error) {
+                          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+                          setMessage({ type: 'error', text: `Erro ao sincronizar: ${errorMessage}` });
+                        }
+                      } else {
+                        setMessage({ type: 'success', text: `Liga "${league.name}" selecionada. Adicione a URL da competição para buscar dados automaticamente.` });
                       }
                     }}
                 />;
