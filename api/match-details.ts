@@ -1986,6 +1986,8 @@ export default async function handler(
     try {
       const { html, matchId, competitionUrl } = req.body;
 
+      console.log(`[match-details handler] Recebido: matchId="${matchId}", competitionUrl="${competitionUrl || 'não fornecida'}"`);
+
       if (!html || typeof html !== 'string') {
         return res.status(400).json({ 
           error: 'É necessário fornecer o HTML no body: { "html": "...", "matchId": "...", "competitionUrl": "..." (opcional) }' 
