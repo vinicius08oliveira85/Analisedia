@@ -100,13 +100,14 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
 
     try {
       const result = await scrapeMatchesFromSokkerPro();
+      const leaguesCount = Array.isArray(result.leagues) ? result.leagues.length : (result.leagueGroups?.length || 0);
       setMessage({
         type: 'success',
-        text: `${result.message}. ${result.leagues.length} ligas encontradas.`
+        text: `${result.message}. ${leaguesCount} liga(s) encontrada(s).`
       });
       onMatchesUpdated(result.matches);
-      if (onLeaguesUpdated && result.leagues.length > 0) {
-        onLeaguesUpdated(result.leagues);
+      if (onLeaguesUpdated && result.leagueGroups && result.leagueGroups.length > 0) {
+        onLeaguesUpdated(result.leagueGroups);
       }
     } catch (error) {
       console.error('Erro ao fazer scraping do sokkerpro:', error);

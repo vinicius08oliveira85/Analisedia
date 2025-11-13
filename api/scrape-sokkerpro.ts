@@ -466,6 +466,7 @@ export default async function handler(
 
       return res.status(200).json({
         success: true,
+        count: matches.length,
         matches: matches,
         leagues: leagueGroups.map(g => g.leagueName),
         leagueGroups: leagueGroups,
