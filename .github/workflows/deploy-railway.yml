@@ -1,0 +1,48 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Permite execução manual
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+          cache: 'npm'
+      
+      - name: Instalar dependências
+        run: npm ci
+      
+      - name: Build do projeto
+        run: npm run build
+      
+      - name: Verificar build
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "Erro: Diretório dist não foi criado"
+            exit 1
+          fi
+          echo "✅ Build concluído com sucesso!"
+      
+      - name: Instalar Railway CLI
+        run: npm install -g @railway/cli@latest
+      
+      - name: Deploy para Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "🚀 Iniciando deploy para Railway..."
+          railway link --token $RAILWAY_TOKEN ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --token $RAILWAY_TOKEN --service ${{ secrets.RAILWAY_SERVICE_ID || '' }}
+          echo "✅ Deploy concluído com sucesso!"
+

@@ -7,9 +7,7 @@ import { StandingsTab } from './StandingsTab';
 import { GoalAnalysisTab } from './GoalAnalysisTab';
 import { GeminiAnalysis } from './GeminiAnalysis';
 import { ProbabilityAnalysisTab } from './ProbabilityAnalysisTab';
-import { UpdateMatchDetails } from './UpdateMatchDetails';
-import { UpdateLiveStatus } from './UpdateLiveStatus';
-import { LeaguesTab } from './LeaguesTab';
+import { SettingsTab } from './SettingsTab';
 import { scrapeMatchDetailsFromURL, applyMatchDetailsUpdate } from '../services/matchDetailsService';
 import type { MatchDetails, Tab, LiveMatchStatus, MatchOdds } from '../types';
 import type { League } from '../types/league';
@@ -123,6 +121,12 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
                     match={currentMatch}
                     onLeagueSelected={handleLeagueSelected}
                 />;
+      case 'Configurações':
+        return <SettingsTab 
+                    match={currentMatch}
+                    onDetailsUpdated={handleDetailsUpdated}
+                    onStatusUpdated={handleLiveStatusUpdated}
+                />;
       default:
         return <OverviewTab 
                     teamA={currentMatch.teamA} 
@@ -162,12 +166,10 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
               ⚠️ Erro ao carregar: {detailsError}
             </p>
             <p className="text-yellow-300 text-[9px] sm:text-[10px] mt-0.5">
-              Use o botão abaixo para atualizar manualmente.
+              Use a aba "Configurações" para atualizar manualmente.
             </p>
           </div>
         )}
-        <UpdateMatchDetails match={currentMatch} onDetailsUpdated={handleDetailsUpdated} />
-        <UpdateLiveStatus match={currentMatch} onStatusUpdated={handleLiveStatusUpdated} />
         <MatchHeader 
           teamA={currentMatch.teamA} 
           teamB={currentMatch.teamB} 

@@ -6,7 +6,7 @@ interface TabsProps {
   setActiveTab: (tab: Tab) => void;
 }
 
-const TABS: Tab[] = ['Visão Geral', 'Análise com IA', 'Probabilidades', 'Confronto Direto', 'Classificação', 'Análise de Gols', 'Ligas'];
+const TABS: Tab[] = ['Visão Geral', 'Análise com IA', 'Probabilidades', 'Confronto Direto', 'Classificação', 'Análise de Gols', 'Ligas', 'Configurações'];
 
 export const Tabs: React.FC<TabsProps> = ({ activeTab, setActiveTab }) => {
   const getTabClass = (tab: Tab) => {

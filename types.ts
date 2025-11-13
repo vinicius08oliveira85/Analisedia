@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type Tab = 'Visão Geral' | 'Análise com IA' | 'Probabilidades' | 'Confronto Direto' | 'Classificação' | 'Análise de Gols' | 'Ligas';
+export type Tab = 'Visão Geral' | 'Análise com IA' | 'Probabilidades' | 'Confronto Direto' | 'Classificação' | 'Análise de Gols' | 'Ligas' | 'Configurações';
 
 export interface ScopedStats<T> {
     home: T;

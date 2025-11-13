@@ -1,110 +1,79 @@
-# 📚 Guia de Deploy - Futibou Analytics
+# 🚀 Guia de Deploy Automático
 
-Este documento contém instruções detalhadas para configurar o deploy automático do projeto.
+Este projeto está configurado para fazer deploy automático no Railway via GitHub Actions.
 
-## 🔄 Deploy Automático Configurado
+## 📋 Pré-requisitos
 
-O projeto está configurado para fazer deploy automático no **Vercel** sempre que houver um push na branch `main`.
+1. Conta no [Railway](https://railway.app/)
+2. Projeto criado no Railway
+3. Token de API do Railway
 
-## ⚙️ Configuração Inicial
+## 🔧 Configuração
 
-### 1. Conectar Repositório ao Vercel
+### 1. Obter Token do Railway
 
-1. Acesse [vercel.com](https://vercel.com) e faça login
-2. Clique em **"Add New Project"**
-3. Importe o repositório `vinicius08oliveira85/Academiadasanalises`
-4. Configure o projeto:
-   - **Framework Preset**: Vite
-   - **Root Directory**: `./` (raiz)
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
+1. Acesse [Railway Dashboard](https://railway.app/dashboard)
+2. Vá em **Settings** → **Tokens**
+3. Clique em **New Token**
+4. Dê um nome ao token (ex: "GitHub Actions Deploy")
+5. Copie o token gerado
 
-### 2. Configurar Variáveis de Ambiente no Vercel
+### 2. Obter IDs do Projeto e Serviço
 
-No painel do Vercel, vá em **Settings > Environment Variables** e adicione:
+1. No Railway Dashboard, abra seu projeto
+2. O **Project ID** está na URL: `https://railway.app/project/{PROJECT_ID}`
+3. Para o **Service ID**, clique no serviço e veja na URL: `https://railway.app/project/{PROJECT_ID}/service/{SERVICE_ID}`
 
-```
-GEMINI_API_KEY = sua_chave_api_gemini
-```
+### 3. Configurar Secrets no GitHub
 
-### 3. Configurar GitHub Secrets (Opcional - para GitHub Actions)
+1. Acesse seu repositório no GitHub
+2. Vá em **Settings** → **Secrets and variables** → **Actions**
+3. Clique em **New repository secret**
+4. Adicione os seguintes secrets:
 
-Se quiser usar GitHub Actions para validação antes do deploy:
+   - **`RAILWAY_TOKEN`**: Token de API do Railway
+   - **`RAILWAY_PROJECT_ID`**: ID do projeto no Railway
+   - **`RAILWAY_SERVICE_ID`**: ID do serviço no Railway (opcional, se não informado, usa o serviço padrão)
 
-1. No GitHub, vá em **Settings > Secrets and variables > Actions**
-2. Adicione os seguintes secrets:
+## 🔄 Como Funciona
 
-   - **VERCEL_TOKEN**: 
-     - Obtenha em [Vercel Settings > Tokens](https://vercel.com/account/tokens)
-     - Crie um novo token com escopo de projeto
-   
-   - **VERCEL_ORG_ID** e **VERCEL_PROJECT_ID**:
-     - Após o primeiro deploy no Vercel, execute `vercel link` localmente
-     - Os IDs estarão no arquivo `.vercel/project.json`
-     - Ou encontre no dashboard do Vercel em Settings > General
+O workflow `.github/workflows/deploy-railway.yml` é acionado automaticamente quando:
 
-   - **GEMINI_API_KEY**: 
-     - Mesma chave usada no Vercel (para builds no GitHub Actions)
+- Há um push para a branch `main`
+- Você executa manualmente via **Actions** → **Deploy to Railway** → **Run workflow**
 
-## 🚀 Como Funciona
+### Processo de Deploy
 
-### Deploy Automático via Vercel (Recomendado)
+1. ✅ Checkout do código
+2. ✅ Configuração do Node.js 22.12.0
+3. ✅ Instalação de dependências (`npm ci`)
+4. ✅ Build do projeto (`npm run build`)
+5. ✅ Verificação do build
+6. ✅ Instalação da Railway CLI
+7. ✅ Deploy para Railway
 
-1. **Push para `main`**:
-   ```bash
-   git add .
-   git commit -m "Sua mensagem"
-   git push origin main
-   ```
+## 📝 Notas
 
-2. O Vercel detecta automaticamente o push
-3. Executa o build
-4. Faz deploy da aplicação
-5. Você recebe uma URL de preview e produção
+- O deploy usa o `Dockerfile` configurado no projeto
+- O Railway detecta automaticamente o `railway.json` para configurações
+- O build é feito localmente no GitHub Actions antes do deploy
+- O servidor inicia na porta 3000 (configurada no Railway)
 
-### Deploy via GitHub Actions (Opcional)
+## 🔍 Troubleshooting
 
-O workflow `.github/workflows/deploy.yml` está configurado para:
-- Validar o build em cada push/PR
-- Fazer deploy para produção quando mergeado em `main`
+### Erro: "RAILWAY_TOKEN not found"
+- Verifique se o secret `RAILWAY_TOKEN` está configurado no GitHub
 
-## 📋 Checklist de Deploy
+### Erro: "Project not found"
+- Verifique se o `RAILWAY_PROJECT_ID` está correto
+- Certifique-se de que o token tem permissão para acessar o projeto
 
-- [ ] Repositório conectado ao Vercel
-- [ ] Variável `GEMINI_API_KEY` configurada no Vercel
-- [ ] Primeiro deploy realizado com sucesso
-- [ ] URL de produção funcionando
-- [ ] (Opcional) GitHub Secrets configurados
+### Deploy não inicia
+- Verifique os logs em **Actions** no GitHub
+- Certifique-se de que o workflow está habilitado
 
-## 🔍 Verificar Status do Deploy
+## 🔗 Links Úteis
 
-1. **No Vercel Dashboard**: Veja todos os deploys em tempo real
-2. **No GitHub Actions**: Veja os logs de build e validação
-3. **URLs**:
-   - Produção: `https://seu-projeto.vercel.app`
-   - Preview: Cada PR/commit gera uma URL única
-
-## 🐛 Solução de Problemas
-
-### Build falha no Vercel
-
-1. Verifique se `GEMINI_API_KEY` está configurada
-2. Verifique os logs no dashboard do Vercel
-3. Teste o build localmente: `npm run build`
-
-### GitHub Actions falha
-
-1. Verifique se todos os secrets estão configurados
-2. Verifique se os IDs do Vercel estão corretos
-3. Veja os logs detalhados na aba Actions do GitHub
-
-### Deploy não dispara automaticamente
-
-1. Verifique se o repositório está conectado no Vercel
-2. Verifique se está fazendo push para a branch `main`
-3. Verifique as configurações de integração no Vercel
-
-## 📞 Suporte
-
-Para problemas ou dúvidas, abra uma issue no repositório GitHub.
-
+- [Documentação do Railway](https://docs.railway.app/)
+- [Railway CLI](https://docs.railway.app/develop/cli)
+- [GitHub Actions](https://docs.github.com/en/actions)
