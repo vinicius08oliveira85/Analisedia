@@ -1,4 +1,4 @@
-import type { MatchDetails, Match, TeamStreaks, OpponentAnalysisMatch, ScopedStats } from '../types';
+import type { MatchDetails, Match, TeamStreaks, OpponentAnalysisMatch, ScopedStats, Standing, TeamGoalStats, GoalScoringPatterns, CorrectScore } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -9,10 +9,17 @@ export interface MatchDetailsResponse {
     teamAForm: Match[];
     teamBForm: Match[];
     h2hData: Match[];
+    standingsData?: Standing[];
     teamAStreaks: ScopedStats<TeamStreaks>;
     teamBStreaks: ScopedStats<TeamStreaks>;
     teamAOpponentAnalysis: ScopedStats<OpponentAnalysisMatch[]>;
     teamBOpponentAnalysis: ScopedStats<OpponentAnalysisMatch[]>;
+    teamAGoalStats?: ScopedStats<TeamGoalStats>;
+    teamBGoalStats?: ScopedStats<TeamGoalStats>;
+    teamAGoalPatterns?: ScopedStats<GoalScoringPatterns>;
+    teamBGoalPatterns?: ScopedStats<GoalScoringPatterns>;
+    teamACorrectScores?: ScopedStats<{ ht: CorrectScore[]; ft: CorrectScore[] }>;
+    teamBCorrectScores?: ScopedStats<{ ht: CorrectScore[]; ft: CorrectScore[] }>;
   };
   message: string;
 }
@@ -165,10 +172,13 @@ export function applyMatchDetailsUpdate(
     teamAFormCount: update.teamAForm.length,
     teamBFormCount: update.teamBForm.length,
     h2hCount: update.h2hData.length,
+    standingsCount: update.standingsData?.length || 0,
     teamAStreaks: update.teamAStreaks,
     teamBStreaks: update.teamBStreaks,
     teamAAnalysisCount: update.teamAOpponentAnalysis.home.length + update.teamAOpponentAnalysis.global.length,
-    teamBAnalysisCount: update.teamBOpponentAnalysis.away.length + update.teamBOpponentAnalysis.global.length
+    teamBAnalysisCount: update.teamBOpponentAnalysis.away.length + update.teamBOpponentAnalysis.global.length,
+    hasGoalStats: !!(update.teamAGoalStats && update.teamBGoalStats),
+    hasGoalPatterns: !!(update.teamAGoalPatterns && update.teamBGoalPatterns)
   });
 
   return {
@@ -176,10 +186,17 @@ export function applyMatchDetailsUpdate(
     teamAForm: update.teamAForm.length > 0 ? update.teamAForm : currentMatch.teamAForm,
     teamBForm: update.teamBForm.length > 0 ? update.teamBForm : currentMatch.teamBForm,
     h2hData: update.h2hData.length > 0 ? update.h2hData : currentMatch.h2hData,
-    teamAStreaks: update.teamAStreaks,
-    teamBStreaks: update.teamBStreaks,
-    teamAOpponentAnalysis: update.teamAOpponentAnalysis,
-    teamBOpponentAnalysis: update.teamBOpponentAnalysis,
+    standingsData: (update.standingsData && update.standingsData.length > 0) ? update.standingsData : currentMatch.standingsData,
+    teamAStreaks: update.teamAStreaks || currentMatch.teamAStreaks,
+    teamBStreaks: update.teamBStreaks || currentMatch.teamBStreaks,
+    teamAOpponentAnalysis: update.teamAOpponentAnalysis || currentMatch.teamAOpponentAnalysis,
+    teamBOpponentAnalysis: update.teamBOpponentAnalysis || currentMatch.teamBOpponentAnalysis,
+    teamAGoalStats: update.teamAGoalStats || currentMatch.teamAGoalStats,
+    teamBGoalStats: update.teamBGoalStats || currentMatch.teamBGoalStats,
+    teamAGoalPatterns: update.teamAGoalPatterns || currentMatch.teamAGoalPatterns,
+    teamBGoalPatterns: update.teamBGoalPatterns || currentMatch.teamBGoalPatterns,
+    teamACorrectScores: update.teamACorrectScores || currentMatch.teamACorrectScores,
+    teamBCorrectScores: update.teamBCorrectScores || currentMatch.teamBCorrectScores,
   };
 }
 
