@@ -52,9 +52,32 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
 
       const result: MatchDetailsResponse = await updateMatchDetailsFromHTML(html, match.id);
       console.log('Resposta da API:', result);
+      
+      // Verifica se há dados extraídos
+      if (result.data) {
+        const hasData = 
+          result.data.teamAForm.length > 0 || 
+          result.data.teamBForm.length > 0 || 
+          result.data.h2hData.length > 0 ||
+          result.data.teamAOpponentAnalysis.home.length > 0 ||
+          result.data.teamAOpponentAnalysis.away.length > 0 ||
+          result.data.teamAOpponentAnalysis.global.length > 0;
+        
+        if (!hasData) {
+          setMessage({ 
+            type: 'error', 
+            text: 'Nenhum dado foi extraído do HTML. Verifique se o HTML está completo e se contém as tabelas de estatísticas.' 
+          });
+          return;
+        }
+      }
+      
       const updatedMatch = applyMatchDetailsUpdate(match, result.data);
       console.log('Match atualizado:', updatedMatch);
-      setMessage({ type: 'success', text: result.message });
+      setMessage({ 
+        type: 'success', 
+        text: `${result.message}. Form: ${result.data.teamAForm.length + result.data.teamBForm.length} jogos, H2H: ${result.data.h2hData.length} jogos` 
+      });
       onDetailsUpdated(updatedMatch);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro ao atualizar detalhes da partida';

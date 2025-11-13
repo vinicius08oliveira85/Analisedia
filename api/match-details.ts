@@ -15,6 +15,8 @@ function defaultStreaks(): TeamStreaks {
 
 // Função para normalizar nome do time (remove acentos, espaços, etc.)
 function normalizeTeamName(name: string): string {
+  if (!name) return '';
+  
   let normalized = name
     .toLowerCase()
     .normalize('NFD')
@@ -26,7 +28,6 @@ function normalizeTeamName(name: string): string {
     'atletico-mg': 'atleticomineiro',
     'atletico mg': 'atleticomineiro',
     'atletico mineiro': 'atleticomineiro',
-    'atletico mg': 'atleticomineiro',
     'atletico': 'atleticomineiro',
     'flamengo': 'flamengo',
     'fluminense': 'fluminense',
@@ -45,6 +46,23 @@ function normalizeTeamName(name: string): string {
     'athletico paranaense': 'athleticoparanaense',
     'athletico-pr': 'athleticoparanaense',
     'athletico pr': 'athleticoparanaense',
+    // Times internacionais comuns
+    'franca': 'franca',
+    'france': 'franca',
+    'ucrania': 'ucrania',
+    'ukraine': 'ucrania',
+    'brasil': 'brasil',
+    'brazil': 'brasil',
+    'argentina': 'argentina',
+    'portugal': 'portugal',
+    'espanha': 'espanha',
+    'spain': 'espanha',
+    'italia': 'italia',
+    'italy': 'italia',
+    'alemanha': 'alemanha',
+    'germany': 'alemanha',
+    'inglaterra': 'inglaterra',
+    'england': 'inglaterra',
   };
   
   // Remove caracteres especiais para comparação
@@ -53,7 +71,7 @@ function normalizeTeamName(name: string): string {
   // Verifica se há uma variação conhecida
   for (const [key, value] of Object.entries(variations)) {
     const keyCleaned = key.replace(/[^a-z0-9]/g, '');
-    if (cleaned.includes(keyCleaned) || keyCleaned.includes(cleaned)) {
+    if (cleaned === keyCleaned || cleaned.includes(keyCleaned) || keyCleaned.includes(cleaned)) {
       return value;
     }
   }
@@ -155,9 +173,12 @@ function extractAllFormTablesWithNames(html: string): Array<{ teamName: string; 
 
 // Função auxiliar para encontrar tabela de form para um time específico
 function findTableForTeam(tables: Array<{ teamName: string; matches: Match[] }>, searchTeam: string): Match[] | null {
+  if (!searchTeam) return null;
+  
   const searchNormalized = normalizeTeamName(searchTeam);
   console.log(`  Procurando tabela para: "${searchTeam}" (normalizado: "${searchNormalized}")`);
   
+  // Primeira tentativa: match exato ou parcial
   for (const table of tables) {
     const foundNormalized = normalizeTeamName(table.teamName);
     console.log(`    Comparando com: "${table.teamName}" (normalizado: "${foundNormalized}")`);
@@ -166,6 +187,32 @@ function findTableForTeam(tables: Array<{ teamName: string; matches: Match[] }>,
         foundNormalized.includes(searchNormalized) || 
         searchNormalized.includes(foundNormalized)) {
       console.log(`    ✓ Match encontrado!`);
+      return table.matches;
+    }
+  }
+  
+  // Segunda tentativa: comparação mais flexível (primeiras 3-4 letras)
+  if (searchNormalized.length >= 3) {
+    const searchPrefix = searchNormalized.substring(0, Math.min(4, searchNormalized.length));
+    for (const table of tables) {
+      const foundNormalized = normalizeTeamName(table.teamName);
+      if (foundNormalized.startsWith(searchPrefix) || searchNormalized.startsWith(foundNormalized.substring(0, Math.min(4, foundNormalized.length)))) {
+        console.log(`    ✓ Match encontrado (prefixo)!`);
+        return table.matches;
+      }
+    }
+  }
+  
+  // Terceira tentativa: busca por palavras-chave (para nomes compostos)
+  const searchWords = searchNormalized.split(/(?<=[a-z])(?=[a-z])/).filter(w => w.length >= 3);
+  for (const table of tables) {
+    const foundNormalized = normalizeTeamName(table.teamName);
+    const foundWords = foundNormalized.split(/(?<=[a-z])(?=[a-z])/).filter(w => w.length >= 3);
+    
+    // Verifica se pelo menos uma palavra coincide
+    const hasCommonWord = searchWords.some(sw => foundWords.some(fw => fw.includes(sw) || sw.includes(fw)));
+    if (hasCommonWord && searchWords.length > 0) {
+      console.log(`    ✓ Match encontrado (palavra-chave)!`);
       return table.matches;
     }
   }
@@ -203,14 +250,28 @@ function extractAllStreaksTablesWithNames(html: string): Array<{ teamName: strin
 
 // Função auxiliar para encontrar streaks para um time específico
 function findStreaksForTeam(tables: Array<{ teamName: string; streaks: ScopedStats<TeamStreaks> }>, searchTeam: string): ScopedStats<TeamStreaks> | null {
+  if (!searchTeam) return null;
+  
   const searchNormalized = normalizeTeamName(searchTeam);
   
+  // Primeira tentativa: match exato ou parcial
   for (const table of tables) {
     const foundNormalized = normalizeTeamName(table.teamName);
     if (foundNormalized === searchNormalized || 
         foundNormalized.includes(searchNormalized) || 
         searchNormalized.includes(foundNormalized)) {
       return table.streaks;
+    }
+  }
+  
+  // Segunda tentativa: comparação por prefixo
+  if (searchNormalized.length >= 3) {
+    const searchPrefix = searchNormalized.substring(0, Math.min(4, searchNormalized.length));
+    for (const table of tables) {
+      const foundNormalized = normalizeTeamName(table.teamName);
+      if (foundNormalized.startsWith(searchPrefix) || searchNormalized.startsWith(foundNormalized.substring(0, Math.min(4, foundNormalized.length)))) {
+        return table.streaks;
+      }
     }
   }
   
@@ -438,14 +499,28 @@ function extractAllAnalysisTablesWithNames(html: string): Array<{ teamName: stri
 
 // Função auxiliar para encontrar análise para um time específico
 function findAnalysisForTeam(tables: Array<{ teamName: string; analysis: ScopedStats<OpponentAnalysisMatch[]> }>, searchTeam: string): ScopedStats<OpponentAnalysisMatch[]> | null {
+  if (!searchTeam) return null;
+  
   const searchNormalized = normalizeTeamName(searchTeam);
   
+  // Primeira tentativa: match exato ou parcial
   for (const table of tables) {
     const foundNormalized = normalizeTeamName(table.teamName);
     if (foundNormalized === searchNormalized || 
         foundNormalized.includes(searchNormalized) || 
         searchNormalized.includes(foundNormalized)) {
       return table.analysis;
+    }
+  }
+  
+  // Segunda tentativa: comparação por prefixo
+  if (searchNormalized.length >= 3) {
+    const searchPrefix = searchNormalized.substring(0, Math.min(4, searchNormalized.length));
+    for (const table of tables) {
+      const foundNormalized = normalizeTeamName(table.teamName);
+      if (foundNormalized.startsWith(searchPrefix) || searchNormalized.startsWith(foundNormalized.substring(0, Math.min(4, foundNormalized.length)))) {
+        return table.analysis;
+      }
     }
   }
   
@@ -812,7 +887,7 @@ function extractH2HMatches(html: string): Match[] {
 
 // Função para extrair informações básicas do jogo
 function extractMatchInfo(html: string): { teamA: string; teamB: string; date: string; competition: string } | null {
-  // Procura por JSON-LD
+  // Estratégia 1: Procura por JSON-LD
   const jsonScriptRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gs;
   const scripts = html.match(jsonScriptRegex);
   
@@ -823,18 +898,94 @@ function extractMatchInfo(html: string): { teamA: string; teamB: string; date: s
         if (jsonMatch) {
           const data = JSON.parse(jsonMatch[0]);
           if (data['@type'] === 'SportsEvent') {
-            return {
-              teamA: data.homeTeam?.name || '',
-              teamB: data.awayTeam?.name || '',
-              date: data.startDate || '',
-              competition: data.location?.name?.split(' - ')[1] || data.location?.name || ''
-            };
+            const teamA = data.homeTeam?.name || '';
+            const teamB = data.awayTeam?.name || '';
+            if (teamA && teamB) {
+              return {
+                teamA,
+                teamB,
+                date: data.startDate || '',
+                competition: data.location?.name?.split(' - ')[1] || data.location?.name || ''
+              };
+            }
+          }
+          // Também verifica @graph
+          if (data['@graph'] && Array.isArray(data['@graph'])) {
+            for (const item of data['@graph']) {
+              if (item['@type'] === 'SportsEvent') {
+                const teamA = item.homeTeam?.name || '';
+                const teamB = item.awayTeam?.name || '';
+                if (teamA && teamB) {
+                  return {
+                    teamA,
+                    teamB,
+                    date: item.startDate || '',
+                    competition: item.location?.name?.split(' - ')[1] || item.location?.name || ''
+                  };
+                }
+              }
+            }
           }
         }
       } catch (e) {
         // Continua procurando
       }
     }
+  }
+
+  // Estratégia 2: Procura por títulos ou headings com nomes dos times
+  // Padrão comum: "França vs Ucrânia" ou "França - Ucrânia"
+  const titlePatterns = [
+    /<h[1-3][^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-)\s+([^<]+)<\/h[1-3]>/i,
+    /<title[^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-)\s+([^<]+)<\/title>/i,
+    /class="[^"]*match-title[^"]*"[^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-)\s+([^<]+)</i,
+  ];
+
+  for (const pattern of titlePatterns) {
+    const match = html.match(pattern);
+    if (match && match[1] && match[2]) {
+      return {
+        teamA: match[1].trim(),
+        teamB: match[2].trim(),
+        date: '',
+        competition: ''
+      };
+    }
+  }
+
+  // Estratégia 3: Procura por tabelas de form e extrai nomes dos times de lá
+  const formTableRegex = /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>/gi;
+  const teamNames: string[] = [];
+  let formMatch;
+  while ((formMatch = formTableRegex.exec(html)) !== null && teamNames.length < 2) {
+    const teamName = formMatch[1].trim();
+    if (teamName && !teamNames.includes(teamName)) {
+      teamNames.push(teamName);
+    }
+  }
+
+  if (teamNames.length >= 2) {
+    return {
+      teamA: teamNames[0],
+      teamB: teamNames[1],
+      date: '',
+      competition: ''
+    };
+  }
+
+  // Estratégia 4: Procura na URL (último recurso)
+  // Exemplo: /franca/ucrania/ -> França vs Ucrânia
+  const urlMatch = html.match(/\/stats\/match\/[^\/]+\/[^\/]+\/([^\/]+)\/([^\/]+)\//);
+  if (urlMatch && urlMatch[1] && urlMatch[2]) {
+    // Converte slug para nome (capitaliza primeira letra)
+    const teamA = urlMatch[1].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    const teamB = urlMatch[2].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return {
+      teamA,
+      teamB,
+      date: '',
+      competition: ''
+    };
   }
 
   return null;
@@ -866,13 +1017,45 @@ export default async function handler(
 
       // Extrai informações básicas
       const matchInfo = extractMatchInfo(html);
-      if (!matchInfo) {
-        return res.status(400).json({ 
-          error: 'Não foi possível extrair informações básicas do jogo do HTML' 
-        });
+      if (!matchInfo || !matchInfo.teamA || !matchInfo.teamB) {
+        // Tenta usar os nomes do matchId se disponível
+        const matchIdParts = (matchId || '').split('-');
+        if (matchIdParts.length >= 2) {
+          const fallbackTeamA = matchIdParts[0].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          const fallbackTeamB = matchIdParts.slice(1).join('-').split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          
+          if (!matchInfo) {
+            return res.status(400).json({ 
+              error: 'Não foi possível extrair informações básicas do jogo do HTML',
+              suggestion: `Tentando usar: ${fallbackTeamA} vs ${fallbackTeamB}`,
+              debug: {
+                htmlLength: html.length,
+                hasJsonLd: html.includes('application/ld+json'),
+                hasSportsEvent: html.includes('SportsEvent'),
+                sample: html.substring(0, 500)
+              }
+            });
+          }
+          
+          // Se matchInfo existe mas está incompleto, completa com fallback
+          if (!matchInfo.teamA) matchInfo.teamA = fallbackTeamA;
+          if (!matchInfo.teamB) matchInfo.teamB = fallbackTeamB;
+        } else {
+          return res.status(400).json({ 
+            error: 'Não foi possível extrair informações básicas do jogo do HTML',
+            debug: {
+              htmlLength: html.length,
+              hasJsonLd: html.includes('application/ld+json'),
+              hasSportsEvent: html.includes('SportsEvent'),
+              matchId: matchId,
+              sample: html.substring(0, 500)
+            }
+          });
+        }
       }
 
       console.log('Match Info extraído:', matchInfo);
+      console.log('Procurando dados para:', matchInfo.teamA, 'vs', matchInfo.teamB);
 
       // NOVA ABORDAGEM: Extrai todas as informações diretamente do HTML pela estrutura
       // Identifica qual tabela pertence a qual time pelo nome encontrado no HTML
