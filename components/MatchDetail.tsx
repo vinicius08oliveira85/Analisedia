@@ -109,6 +109,18 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
                     teamACorrectScores={currentMatch.teamACorrectScores}
                     teamBCorrectScores={currentMatch.teamBCorrectScores}
                 />;
+      case 'Ligas':
+        return <LeaguesTab 
+                    currentMatch={currentMatch}
+                    onLeagueSelected={(league) => {
+                      // Quando uma liga é selecionada, pode ser usado para buscar dados da competição
+                      console.log('Liga selecionada:', league);
+                      if (league.competitionUrl) {
+                        // Pode ser usado para atualizar a partida com dados da competição
+                        setMessage({ type: 'success', text: `Liga "${league.name}" selecionada. Use a URL da competição para buscar dados.` });
+                      }
+                    }}
+                />;
       default:
         return <OverviewTab 
                     teamA={currentMatch.teamA} 
@@ -152,6 +164,19 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
             </p>
           </div>
         )}
+        
+        {message && (
+          <div
+            className={`mb-4 p-3 rounded-md ${
+              message.type === 'success'
+                ? 'bg-green-900/50 border border-green-700 text-green-200'
+                : 'bg-red-900/50 border border-red-700 text-red-200'
+            }`}
+          >
+            <p className="text-sm">{message.text}</p>
+          </div>
+        )}
+        
         <UpdateMatchDetails match={currentMatch} onDetailsUpdated={handleDetailsUpdated} />
         <UpdateLiveStatus match={currentMatch} onStatusUpdated={handleLiveStatusUpdated} />
         <MatchHeader 
