@@ -1129,20 +1129,38 @@ async function fetchGoalStatsFromCompetition(competitionUrl: string, teamName: s
     console.log(`[fetchGoalStatsFromCompetition] Buscando dados para: "${actualTeamName}" (normalizado: "${normalizedTeam}")`);
     
     // Busca por tabelas de estatísticas (geralmente têm colunas como: Time, J, G, E, D, GP, GC, etc)
+    // Busca a tabela COMPLETA (com tags <table>)
     const statsTableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
     let tableMatch;
     
+    console.log(`[fetchGoalStatsFromCompetition] Buscando tabelas no HTML...`);
+    let tableCount = 0;
+    
     while ((tableMatch = statsTableRegex.exec(html)) !== null) {
-      const tableHtml = tableMatch[1];
+      const fullTableHtml = tableMatch[0]; // Tabela completa com tags
+      const tableHtml = tableMatch[1]; // Apenas conteúdo
+      tableCount++;
+      
+      console.log(`[fetchGoalStatsFromCompetition] Tabela ${tableCount} encontrada (${fullTableHtml.length} chars)`);
       
       // Verifica se é uma tabela de estatísticas (tem "GP", "GC", "Gols" ou similar)
-      if (!tableHtml.includes('GP') && !tableHtml.includes('GC') && !tableHtml.includes('Gols') && !tableHtml.includes('Marcados')) {
+      // Busca tanto no conteúdo quanto na tabela completa
+      const hasStatsKeywords = fullTableHtml.includes('GP') || fullTableHtml.includes('GC') || 
+                               fullTableHtml.includes('Gols') || fullTableHtml.includes('Marcados') ||
+                               fullTableHtml.includes('Jogos') || fullTableHtml.includes('J ') ||
+                               fullTableHtml.includes('Gols Pró') || fullTableHtml.includes('Gols Contra');
+      
+      if (!hasStatsKeywords) {
+        console.log(`[fetchGoalStatsFromCompetition] Tabela ${tableCount} não parece ser de estatísticas, pulando...`);
         continue;
       }
       
-      // Busca linha do time específico
-      const teamRowRegex = new RegExp(`<tr[^>]*>([\\s\\S]*?${actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?)<\\/tr>`, 'i');
-      const teamRow = tableHtml.match(teamRowRegex);
+      console.log(`[fetchGoalStatsFromCompetition] Tabela ${tableCount} parece ser de estatísticas! Buscando linha do time...`);
+      
+      // Busca linha do time específico - busca na tabela COMPLETA
+      const escapedTeamName = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const teamRowRegex = new RegExp(`<tr[^>]*>([\\s\\S]*?${escapedTeamName}[\\s\\S]*?)<\\/tr>`, 'i');
+      const teamRow = fullTableHtml.match(teamRowRegex);
       
       if (teamRow) {
         console.log(`[fetchGoalStatsFromCompetition] Linha do time encontrada!`);
@@ -1165,7 +1183,8 @@ async function fetchGoalStatsFromCompetition(competitionUrl: string, teamName: s
         let goalsConceded = 0;
         
         // Busca cabeçalho da tabela para identificar colunas
-        const headerRow = tableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i);
+        // Busca na tabela completa
+        const headerRow = fullTableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/i);
         let headerCells: string[] = [];
         if (headerRow) {
           const headerCellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
@@ -2358,6 +2377,8 @@ export default async function handler(
       
       if (competitionUrl) {
         console.log(`[Goal Stats] ESTRATÉGIA 0: Buscando dados da página de competição...`);
+        console.log(`[Goal Stats] URL da competição recebida: "${competitionUrl}"`);
+        console.log(`[Goal Stats] Time A: "${matchInfo.teamA}", Time B: "${matchInfo.teamB}"`);
         const teamACompetitionStats = await fetchGoalStatsFromCompetition(competitionUrl, matchInfo.teamA);
         const teamBCompetitionStats = await fetchGoalStatsFromCompetition(competitionUrl, matchInfo.teamB);
         
