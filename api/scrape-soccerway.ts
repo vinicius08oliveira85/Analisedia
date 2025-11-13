@@ -43,6 +43,24 @@ async function fetchSiteHTML(url: string): Promise<string> {
   }
 }
 
+// Função para detectar se é uma SPA (Single Page Application)
+function isSPA(html: string): boolean {
+  // Verifica se o HTML tem apenas skeleton/loading (comum em SPAs)
+  const hasOnlySkeleton = /<div[^>]*class="[^"]*sk[^"]*"[^>]*>[\s\S]*?Loading/i.test(html) && 
+                          !html.includes('event__match') && 
+                          !html.includes('event__homeTeam') && 
+                          !html.includes('event__awayTeam');
+  
+  const hasLiveTableEmpty = /<div[^>]*id=["']live-table["'][^>]*>[\s\S]*?<div[^>]*class="[^"]*sk[^"]*"/i.test(html);
+  
+  const bodyContent = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const bodyText = bodyContent ? bodyContent[1] : '';
+  const bodyTextLength = bodyText.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').trim().length;
+  
+  // Se o body tem muito pouco conteúdo (menos de 2000 chars sem scripts/styles), provavelmente é SPA
+  return hasOnlySkeleton || hasLiveTableEmpty || (bodyTextLength < 2000 && !html.includes('event__match'));
+}
+
 // Função para limpar texto HTML
 function cleanHTMLText(value: string): string {
   return value
@@ -61,63 +79,112 @@ function cleanHTMLText(value: string): string {
 function extractMatchesFromSoccerway(html: string): MatchDetails[] {
   const matches: MatchDetails[] = [];
   
-  // Estratégia 1: Busca por JSON-LD (Schema.org)
-  const jsonScriptRegex = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
-  let scriptMatch;
+  // Estratégia 1: Busca por estrutura específica do Soccerway/FlashScore (event__match)
+  // O Soccerway usa classes como "event__match", "event__homeTeam", "event__awayTeam"
+  const eventMatchRegex = /<div[^>]*class="[^"]*event__match[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+  let eventMatch;
   
-  while ((scriptMatch = jsonScriptRegex.exec(html)) !== null) {
-    const scriptContent = scriptMatch[1].trim();
-    if (!scriptContent) continue;
+  while ((eventMatch = eventMatchRegex.exec(html)) !== null) {
+    const eventHtml = eventMatch[1];
     
-    try {
-      const data: any = JSON.parse(scriptContent);
+    // Extrai times
+    const homeTeamMatch = eventHtml.match(/<div[^>]*class="[^"]*event__homeTeam[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i);
+    const awayTeamMatch = eventHtml.match(/<div[^>]*class="[^"]*event__awayTeam[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i);
+    
+    if (homeTeamMatch && awayTeamMatch) {
+      const teamA = cleanHTMLText(homeTeamMatch[1]);
+      const teamB = cleanHTMLText(awayTeamMatch[1]);
       
-      if (data['@graph'] && Array.isArray(data['@graph'])) {
-        const sportsEvents = data['@graph'].filter((event: any) => 
-          event && event['@type'] === 'SportsEvent'
-        );
-        if (sportsEvents.length > 0) {
-          for (const event of sportsEvents) {
-            const match = convertToMatchDetails(event);
-            if (match) matches.push(match);
+      // Extrai data/hora
+      const timeMatch = eventHtml.match(/<span[^>]*class="[^"]*event__time[^"]*"[^>]*>([^<]+)<\/span>/i);
+      const dateMatch = eventHtml.match(/<span[^>]*class="[^"]*event__date[^"]*"[^>]*>([^<]+)<\/span>/i);
+      
+      // Extrai URL do jogo
+      const linkMatch = eventHtml.match(/<a[^>]*href="([^"]*)"[^>]*>/i);
+      const matchUrl = linkMatch ? linkMatch[1] : undefined;
+      
+      // Extrai competição (geralmente está em um elemento pai)
+      const competitionMatch = html.match(/<div[^>]*class="[^"]*event__title[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i) ||
+                                html.match(/<span[^>]*class="[^"]*event__league[^"]*"[^>]*>([^<]+)<\/span>/i);
+      
+      let dateStr = new Date().toISOString().split('T')[0];
+      let timeStr = timeMatch ? cleanHTMLText(timeMatch[1]) : '00:00';
+      
+      if (dateMatch) {
+        try {
+          const dateText = cleanHTMLText(dateMatch[1]);
+          // Tenta parsear data no formato do Soccerway
+          const parsedDate = new Date(dateText);
+          if (!isNaN(parsedDate.getTime())) {
+            dateStr = parsedDate.toISOString().split('T')[0];
           }
-          continue;
+        } catch (e) {
+          // Mantém data atual
         }
       }
       
-      if (data['@type'] === 'SportsEvent') {
-        const match = convertToMatchDetails(data);
-        if (match) matches.push(match);
-      }
-    } catch (error) {
-      // Continua para próxima estratégia
+      const matchId = `soccerway_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const fullUrl = matchUrl && !matchUrl.startsWith('http') ? `https://www.soccerway.com${matchUrl}` : matchUrl;
+      
+      matches.push(createMatchDetails(
+        matchId,
+        teamA,
+        teamB,
+        '',
+        '',
+        dateStr,
+        timeStr,
+        competitionMatch ? cleanHTMLText(competitionMatch[1]) : 'Competição',
+        fullUrl
+      ));
     }
   }
   
-  // Estratégia 2: Busca por tabelas HTML com jogos (estrutura do Soccerway)
+  // Estratégia 2: Busca por JSON-LD (Schema.org)
   if (matches.length === 0) {
-    // Soccerway usa classes específicas como "match", "match-link", etc.
-    const matchLinkRegex = /<a[^>]*class="[^"]*match[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+    const jsonScriptRegex = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
+    let scriptMatch;
+    
+    while ((scriptMatch = jsonScriptRegex.exec(html)) !== null) {
+      const scriptContent = scriptMatch[1].trim();
+      if (!scriptContent) continue;
+      
+      try {
+        const data: any = JSON.parse(scriptContent);
+        
+        if (data['@graph'] && Array.isArray(data['@graph'])) {
+          const sportsEvents = data['@graph'].filter((event: any) => 
+            event && event['@type'] === 'SportsEvent'
+          );
+          if (sportsEvents.length > 0) {
+            for (const event of sportsEvents) {
+              const match = convertToMatchDetails(event);
+              if (match) matches.push(match);
+            }
+            continue;
+          }
+        }
+        
+        if (data['@type'] === 'SportsEvent') {
+          const match = convertToMatchDetails(data);
+          if (match) matches.push(match);
+        }
+      } catch (error) {
+        // Continua para próxima estratégia
+      }
+    }
+  }
+  
+  // Estratégia 3: Busca por links de jogos
+  if (matches.length === 0) {
+    const matchLinkRegex = /<a[^>]*href="([^"]*\/matches\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
     let linkMatch;
     
     while ((linkMatch = matchLinkRegex.exec(html)) !== null) {
       const matchUrl = linkMatch[1];
       const matchHtml = linkMatch[2];
       
-      // Extrai times e data do link/match
       const match = parseMatchFromSoccerwayLink(matchHtml, matchUrl, html);
-      if (match) matches.push(match);
-    }
-  }
-  
-  // Estratégia 3: Busca por divs com classe "match" ou "match-row"
-  if (matches.length === 0) {
-    const matchDivRegex = /<div[^>]*class="[^"]*(?:match|match-row|match-info)[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
-    let divMatch;
-    
-    while ((divMatch = matchDivRegex.exec(html)) !== null) {
-      const matchHtml = divMatch[1];
-      const match = parseMatchFromSoccerwayDiv(matchHtml, html);
       if (match) matches.push(match);
     }
   }
@@ -456,6 +523,33 @@ export default async function handler(
         }
       }
       
+      // Verifica se é SPA antes de processar
+      const isSPAPage = isSPA(htmlContent);
+      
+      if (isSPAPage) {
+        return res.status(400).json({ 
+          error: 'Site é uma SPA (Single Page Application)',
+          message: 'O soccerway.com é uma aplicação que carrega dados via JavaScript. O HTML inicial não contém os jogos.\n\n' +
+                   '📋 INSTRUÇÕES:\n' +
+                   '1. Abra o site https://www.soccerway.com no navegador\n' +
+                   '2. Aguarde a página carregar completamente (os jogos aparecerem)\n' +
+                   '3. Pressione F12 para abrir o DevTools\n' +
+                   '4. Vá na aba "Elements" (Elementos)\n' +
+                   '5. Clique com botão direito no elemento <html> ou <body>\n' +
+                   '6. Selecione "Copy" > "Copy outerHTML"\n' +
+                   '7. Cole o HTML copiado usando o botão "Colar HTML" no aplicativo\n\n' +
+                   'Ou use a extensão "Save Page WE" para salvar a página completa renderizada.',
+          isSPA: true,
+          debug: {
+            htmlLength: htmlContent.length,
+            hasSkeleton: htmlContent.includes('sk__'),
+            hasLoading: htmlContent.includes('Loading'),
+            hasEventMatch: htmlContent.includes('event__match'),
+            bodyContentLength: (htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] || '').length
+          }
+        });
+      }
+      
       // Extrai os jogos
       const matches = extractMatchesFromSoccerway(htmlContent);
       console.log('[scrape-soccerway] Jogos extraídos:', matches.length);
@@ -467,11 +561,13 @@ export default async function handler(
                    '💡 DICAS:\n' +
                    '- Se você copiou o HTML inicial da página, tente copiar o HTML renderizado (após a página carregar)\n' +
                    '- Use F12 > Elements > Copy outerHTML do elemento <html> ou <body>\n' +
-                   '- Ou salve a página completa usando "Save Page WE" ou similar',
+                   '- Ou salve a página completa usando "Save Page WE" ou similar\n\n' +
+                   'O Soccerway carrega os jogos via JavaScript, então você precisa copiar o HTML após a página carregar completamente.',
           debug: {
             htmlLength: htmlContent.length,
             hasScript: htmlContent.includes('application/ld+json'),
             hasSportsEvent: htmlContent.includes('SportsEvent'),
+            hasEventMatch: htmlContent.includes('event__match'),
             hasTable: htmlContent.includes('<table'),
             hasMatch: htmlContent.includes('match'),
             sample: htmlContent.substring(0, 500)
