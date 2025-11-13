@@ -50,6 +50,45 @@ export async function scrapeMatchesFromSite(url?: string): Promise<ScrapeMatches
 }
 
 /**
+ * Busca jogos do OpenLigaDB (Ligas Alemãs - 100% Gratuito e Sem Limites)
+ */
+export async function getMatchesFromOpenLigaDB(league: string = 'bl1', season?: number, date?: string): Promise<ScrapeMatchesResponse> {
+  try {
+    const seasonParam = season || new Date().getFullYear();
+    const params = new URLSearchParams({
+      league,
+      season: seasonParam.toString(),
+      ...(date && { date })
+    });
+
+    const response = await fetch(`${API_BASE_URL}/openligadb?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: 'Erro desconhecido',
+        message: `Erro HTTP: ${response.status}`,
+        details: `Status: ${response.status}`
+      }));
+
+      const error = new Error(errorData.message || errorData.error || `Erro HTTP: ${response.status}`);
+      (error as any).details = errorData.details || errorData.error;
+      throw error;
+    }
+
+    const data: ScrapeMatchesResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erro ao buscar dados do OpenLigaDB:', error);
+    throw error;
+  }
+}
+
+/**
  * Faz scraping de jogos do sokkerpro.com
  */
 export async function scrapeMatchesFromSokkerPro(url?: string, html?: string): Promise<ScrapeMatchesResponse> {

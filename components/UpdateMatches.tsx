@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { updateMatchesFromHTML, uploadMatchesFile, type UpdateMatchesResponse } from '../services/matchesService';
-import { scrapeMatchesFromSite, scrapeMatchesFromSokkerPro } from '../services/scrapeService';
+import { scrapeMatchesFromSite, scrapeMatchesFromSokkerPro, getMatchesFromOpenLigaDB } from '../services/scrapeService';
 import type { MatchDetails } from '../types';
 
 interface UpdateMatchesProps {
@@ -126,6 +126,43 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
     }
   };
 
+  const handleOpenLigaDB = async () => {
+    setIsUpdating(true);
+    setMessage(null);
+
+    try {
+      // Busca jogos da Bundesliga (bl1) de hoje
+      const today = new Date().toISOString().split('T')[0];
+      const result = await getMatchesFromOpenLigaDB('bl1', undefined, today);
+      const leaguesCount = Array.isArray(result.leagues) ? result.leagues.length : (result.leagueGroups?.length || 0);
+      setMessage({
+        type: 'success',
+        text: `${result.message}. ${leaguesCount} liga(s) encontrada(s).`
+      });
+      onMatchesUpdated(result.matches);
+      if (onLeaguesUpdated && result.leagueGroups && result.leagueGroups.length > 0) {
+        onLeaguesUpdated(result.leagueGroups);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados do OpenLigaDB:', error);
+      let errorMessage = 'Erro ao buscar dados do OpenLigaDB';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+
+      if (error && typeof error === 'object' && 'details' in error) {
+        errorMessage = `${errorMessage}: ${error.details}`;
+      }
+
+      setMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleScrapeSokkerPro = async () => {
     setIsUpdating(true);
     setMessage(null);
@@ -173,6 +210,14 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
             title="Faz scraping direto do site academiadasapostasbrasil.com"
           >
             {isUpdating ? 'Processando...' : '🔄 Buscar do Site'}
+          </button>
+          <button
+            onClick={handleOpenLigaDB}
+            disabled={isUpdating}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            title="Busca jogos da Bundesliga (100% gratuito, sem limites)"
+          >
+            {isUpdating ? 'Processando...' : '🇩🇪 Bundesliga (Gratuito)'}
           </button>
           <button
             onClick={handleScrapeSokkerPro}
