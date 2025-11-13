@@ -215,6 +215,21 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
         </div>
       )}
 
+      <div className="mt-4 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
+        <p className="text-blue-200 text-sm font-semibold mb-2">📋 Como copiar HTML do SokkerPro:</p>
+        <ol className="text-blue-100 text-xs space-y-1 list-decimal list-inside ml-2">
+          <li>Abra <code className="bg-blue-900/50 px-1 rounded">https://sokkerpro.com</code> e aguarde os jogos carregarem</li>
+          <li>Pressione <kbd className="bg-gray-700 px-1 rounded">F12</kbd> para abrir DevTools</li>
+          <li>Vá na aba <strong>"Elements"</strong> (Elementos)</li>
+          <li>Clique em <code className="bg-blue-900/50 px-1 rounded">&lt;html&gt;</code> ou <code className="bg-blue-900/50 px-1 rounded">&lt;body&gt;</code></li>
+          <li>Botão direito → <strong>"Copy"</strong> → <strong>"Copy outerHTML"</strong></li>
+          <li>Cole aqui usando o botão <strong>"Colar HTML"</strong></li>
+        </ol>
+        <p className="text-blue-200 text-xs mt-2">
+          💡 <strong>Alternativa:</strong> No Console (F12), digite: <code className="bg-blue-900/50 px-1 rounded">copy(document.documentElement.outerHTML)</code>
+        </p>
+      </div>
+
       <p className="text-gray-400 text-sm mt-3">
         💡 <strong>Dica:</strong> Se "Buscar do Site" não funcionar (erro 403), o site pode estar bloqueando requisições automáticas. Use "Colar HTML" ou "Upload de Arquivo" como alternativa.
       </p>
