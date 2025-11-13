@@ -1209,7 +1209,15 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
 
   const normalizedTeam = normalizeTeamName(teamName);
   
-  console.log(`[extractGoalStats] Buscando stats para ${teamName} (${scope}) - normalizado: ${normalizedTeam}`);
+  console.log(`[extractGoalStats] ===== Buscando stats para ${teamName} (${scope}) =====`);
+  console.log(`[extractGoalStats] Nome normalizado: "${normalizedTeam}"`);
+
+  // PRIMEIRO: Encontra o nome exato do time no HTML (igual ao extractLast10Matches)
+  const actualTeamName = findTeamNameInHTML(html, teamName);
+  console.log(`[extractGoalStats] Nome encontrado no HTML: ${actualTeamName || 'NÃO ENCONTRADO'}`);
+  
+  const searchName = actualTeamName || teamName;
+  const searchNormalized = normalizeTeamName(searchName);
 
   // Usa a mesma abordagem do extractAllFormTablesWithNames: busca todas as tabelas com seus nomes
   // Busca na seção "ÚLTIMOS 10 JOGOS" ou "GOLS"
@@ -1247,36 +1255,50 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
     }
   }
   
-  console.log(`[extractGoalStats] Total de ${goalStatsTables.length} tabelas encontradas. Buscando para: "${teamName}" (normalizado: "${normalizedTeam}")`);
+  console.log(`[extractGoalStats] Total de ${goalStatsTables.length} tabelas encontradas. Buscando para: "${teamName}" (normalizado: "${normalizedTeam}", encontrado no HTML: "${searchName}")`);
   
-  // Encontra a tabela do time específico - busca exata primeiro, depois flexível
+  // ESTRATÉGIA 1: Busca exata usando o nome encontrado no HTML
   let foundTable = goalStatsTables.find(t => {
     const foundNormalized = normalizeTeamName(t.teamName);
-    const isExactMatch = foundNormalized === normalizedTeam;
+    const isExactMatch = foundNormalized === searchNormalized;
     if (isExactMatch) {
-      console.log(`[extractGoalStats] ✓ Match EXATO encontrado: "${t.teamName}" (normalizado: "${foundNormalized}") === "${normalizedTeam}"`);
+      console.log(`[extractGoalStats] ✓✓✓ Match EXATO encontrado: "${t.teamName}" (normalizado: "${foundNormalized}") === "${searchNormalized}"`);
     }
     return isExactMatch;
   });
   
-  // Se não encontrou exato, tenta busca flexível (mas mais restritiva)
+  // ESTRATÉGIA 2: Busca exata usando o nome original (caso o findTeamNameInHTML não tenha encontrado)
   if (!foundTable) {
-    console.log(`[extractGoalStats] Buscando match flexível para "${normalizedTeam}"...`);
+    foundTable = goalStatsTables.find(t => {
+      const foundNormalized = normalizeTeamName(t.teamName);
+      const isExactMatch = foundNormalized === normalizedTeam;
+      if (isExactMatch) {
+        console.log(`[extractGoalStats] ✓ Match EXATO (nome original) encontrado: "${t.teamName}" (normalizado: "${foundNormalized}") === "${normalizedTeam}"`);
+      }
+      return isExactMatch;
+    });
+  }
+  
+  // ESTRATÉGIA 3: Busca flexível (mas mais restritiva) - só se não encontrou exato
+  if (!foundTable) {
+    console.log(`[extractGoalStats] Buscando match flexível para "${searchNormalized}"...`);
     for (const t of goalStatsTables) {
       const foundNormalized = normalizeTeamName(t.teamName);
       const foundCleaned = foundNormalized.replace(/[^a-z0-9]/g, '');
-      const searchCleaned = normalizedTeam.replace(/[^a-z0-9]/g, '');
+      const searchCleaned = searchNormalized.replace(/[^a-z0-9]/g, '');
       
       // Match flexível: um contém o outro E tem pelo menos 4 caracteres em comum
+      // E também verifica que não é um match muito genérico (ex: "time" vs "time")
       const hasMatch = (foundCleaned.includes(searchCleaned) || searchCleaned.includes(foundCleaned)) &&
-                      (foundCleaned.length >= 4 && searchCleaned.length >= 4);
+                      (foundCleaned.length >= 4 && searchCleaned.length >= 4) &&
+                      (foundCleaned.length > 5 || searchCleaned.length > 5); // Evita matches muito curtos
       
       if (hasMatch) {
-        console.log(`[extractGoalStats] ✓ Match FLEXÍVEL encontrado: "${t.teamName}" (normalizado: "${foundNormalized}") ~= "${normalizedTeam}"`);
+        console.log(`[extractGoalStats] ✓ Match FLEXÍVEL encontrado: "${t.teamName}" (normalizado: "${foundNormalized}") ~= "${searchNormalized}"`);
         foundTable = t;
         break;
       } else {
-        console.log(`[extractGoalStats]   - Não match: "${t.teamName}" (normalizado: "${foundNormalized}") vs "${normalizedTeam}"`);
+        console.log(`[extractGoalStats]   - Não match: "${t.teamName}" (normalizado: "${foundNormalized}") vs "${searchNormalized}"`);
       }
     }
   }
@@ -1696,25 +1718,50 @@ export default async function handler(
         global: teamBGoalStatsGlobal
       };
       
-      // Validação: verifica se os dados são diferentes (não devem ser iguais)
-      const teamAHomeScored = teamAGoalStats.home.avgGoalsScored;
-      const teamBHomeScored = teamBGoalStats.home.avgGoalsScored;
+      // Validação completa: verifica se os dados são diferentes (não devem ser iguais)
+      const checkDuplication = (scope: 'home' | 'away' | 'global') => {
+        const teamA = teamAGoalStats[scope];
+        const teamB = teamBGoalStats[scope];
+        
+        // Verifica múltiplos campos para detectar duplicação
+        const isDuplicated = 
+          teamA.avgGoalsScored > 0 && teamB.avgGoalsScored > 0 && 
+          teamA.avgGoalsScored === teamB.avgGoalsScored &&
+          teamA.avgGoalsConceded > 0 && teamB.avgGoalsConceded > 0 &&
+          teamA.avgGoalsConceded === teamB.avgGoalsConceded &&
+          teamA.over25Pct > 0 && teamB.over25Pct > 0 &&
+          teamA.over25Pct === teamB.over25Pct;
+        
+        if (isDuplicated) {
+          console.error(`[Goal Stats] ⚠⚠⚠ ERRO CRÍTICO: Dados DUPLICADOS detectados no escopo ${scope}!`);
+          console.error(`[Goal Stats] Time A (${matchInfo.teamA}) ${scope}: Marcados=${teamA.avgGoalsScored}, Sofridos=${teamA.avgGoalsConceded}, >2.5=${teamA.over25Pct}%`);
+          console.error(`[Goal Stats] Time B (${matchInfo.teamB}) ${scope}: Marcados=${teamB.avgGoalsScored}, Sofridos=${teamB.avgGoalsConceded}, >2.5=${teamB.over25Pct}%`);
+          console.error(`[Goal Stats] ⚠ Isso indica que a mesma tabela foi usada para ambos os times!`);
+        }
+        
+        return isDuplicated;
+      };
       
-      if (teamAHomeScored > 0 && teamBHomeScored > 0 && teamAHomeScored === teamBHomeScored) {
-        console.warn(`[Goal Stats] ⚠⚠⚠ ATENÇÃO: Dados iguais detectados! Time A (${matchInfo.teamA}) e Time B (${matchInfo.teamB}) têm os mesmos valores.`);
-        console.warn(`[Goal Stats] Time A Home: ${teamAHomeScored}, Time B Home: ${teamBHomeScored}`);
+      const hasHomeDuplication = checkDuplication('home');
+      const hasAwayDuplication = checkDuplication('away');
+      const hasGlobalDuplication = checkDuplication('global');
+      
+      if (hasHomeDuplication || hasAwayDuplication || hasGlobalDuplication) {
+        console.error(`[Goal Stats] ⚠⚠⚠ PROBLEMA DETECTADO: Dados duplicados encontrados em um ou mais escopos!`);
+        console.error(`[Goal Stats] Isso pode indicar que a busca de tabelas não está funcionando corretamente.`);
       }
       
+      console.log(`[Goal Stats] ===== RESUMO FINAL =====`);
       console.log(`[Goal Stats] Time A (${matchInfo.teamA}):`, {
-        home: `Marcados=${teamAGoalStats.home.avgGoalsScored}, Sofridos=${teamAGoalStats.home.avgGoalsConceded}`,
-        away: `Marcados=${teamAGoalStats.away.avgGoalsScored}, Sofridos=${teamAGoalStats.away.avgGoalsConceded}`,
-        global: `Marcados=${teamAGoalStats.global.avgGoalsScored}, Sofridos=${teamAGoalStats.global.avgGoalsConceded}`
+        home: `Marcados=${teamAGoalStats.home.avgGoalsScored}, Sofridos=${teamAGoalStats.home.avgGoalsConceded}, >2.5=${teamAGoalStats.home.over25Pct}%`,
+        away: `Marcados=${teamAGoalStats.away.avgGoalsScored}, Sofridos=${teamAGoalStats.away.avgGoalsConceded}, >2.5=${teamAGoalStats.away.over25Pct}%`,
+        global: `Marcados=${teamAGoalStats.global.avgGoalsScored}, Sofridos=${teamAGoalStats.global.avgGoalsConceded}, >2.5=${teamAGoalStats.global.over25Pct}%`
       });
       
       console.log(`[Goal Stats] Time B (${matchInfo.teamB}):`, {
-        home: `Marcados=${teamBGoalStats.home.avgGoalsScored}, Sofridos=${teamBGoalStats.home.avgGoalsConceded}`,
-        away: `Marcados=${teamBGoalStats.away.avgGoalsScored}, Sofridos=${teamBGoalStats.away.avgGoalsConceded}`,
-        global: `Marcados=${teamBGoalStats.global.avgGoalsScored}, Sofridos=${teamBGoalStats.global.avgGoalsConceded}`
+        home: `Marcados=${teamBGoalStats.home.avgGoalsScored}, Sofridos=${teamBGoalStats.home.avgGoalsConceded}, >2.5=${teamBGoalStats.home.over25Pct}%`,
+        away: `Marcados=${teamBGoalStats.away.avgGoalsScored}, Sofridos=${teamBGoalStats.away.avgGoalsConceded}, >2.5=${teamBGoalStats.away.over25Pct}%`,
+        global: `Marcados=${teamBGoalStats.global.avgGoalsScored}, Sofridos=${teamBGoalStats.global.avgGoalsConceded}, >2.5=${teamBGoalStats.global.over25Pct}%`
       });
       
       // Log detalhado dos resultados
