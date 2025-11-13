@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { MatchDetails } from '../types';
+import type { Match, TeamStreaks, OpponentAnalysisMatch, ScopedStats } from '../types';
+
+// Importa funções do match-details.ts dinamicamente
+// Como não podemos fazer import direto, vamos copiar a lógica essencial
 
 // Função para fazer fetch do HTML do site
 async function fetchSiteHTML(url: string): Promise<string> {
@@ -24,6 +27,26 @@ async function fetchSiteHTML(url: string): Promise<string> {
     console.error('Erro ao fazer fetch do site:', error);
     throw error;
   }
+}
+
+// Processa o HTML e retorna os dados extraídos
+// Usa a mesma lógica do match-details.ts mas processa diretamente
+async function processMatchDetailsHTML(html: string, matchId: string) {
+  // Importa dinamicamente as funções necessárias do match-details
+  // Como não podemos fazer import direto de funções não exportadas,
+  // vamos fazer um POST para a própria API match-details com o HTML
+  // Mas isso não funciona no Vercel...
+  
+  // SOLUÇÃO: Fazer POST do HTML para a API match-details via body
+  // A API match-details já tem toda a lógica de extração
+  
+  // Mas como estamos em serverless, vamos usar uma abordagem diferente:
+  // Enviar o HTML como body para processamento
+  
+  return {
+    html,
+    matchId
+  };
 }
 
 export default async function handler(
@@ -56,35 +79,13 @@ export default async function handler(
       const html = await fetchSiteHTML(url);
       console.log('HTML obtido, tamanho:', html.length);
 
-      // Chama a API match-details internamente processando o HTML
-      // Usa a mesma lógica, mas fazendo fetch interno
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : process.env.VERCEL 
-          ? `https://${process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL}` 
-          : 'http://localhost:3000';
-      
-      try {
-        // Tenta fazer fetch interno
-        const matchDetailsResponse = await fetch(`${baseUrl}/api/match-details`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ html, matchId: matchId || 'unknown' }),
-        });
-
-        if (matchDetailsResponse.ok) {
-          const matchDetailsData = await matchDetailsResponse.json();
-          return res.status(200).json(matchDetailsData);
-        }
-      } catch (fetchError) {
-        console.warn('Erro ao fazer fetch interno:', fetchError);
-        return res.status(500).json({ 
-          error: 'Não foi possível processar os detalhes',
-          details: fetchError instanceof Error ? fetchError.message : 'Erro desconhecido'
-        });
-      }
+      // Retorna o HTML completo para o frontend processar via /api/match-details
+      return res.status(200).json({
+        success: true,
+        matchId: matchId || 'unknown',
+        html: html, // HTML completo
+        message: 'HTML obtido com sucesso'
+      });
 
     } catch (error) {
       console.error('Erro ao fazer scraping dos detalhes:', error);
@@ -97,4 +98,3 @@ export default async function handler(
 
   return res.status(405).json({ error: 'Método não permitido' });
 }
-

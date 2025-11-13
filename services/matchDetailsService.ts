@@ -76,26 +76,78 @@ export async function uploadMatchDetailsFile(
 
 /**
  * Faz scraping automático dos detalhes da partida usando a URL
+ * Usa a API scrape-match-details para obter o HTML e depois processa via match-details
  */
 export async function scrapeMatchDetailsFromURL(
   url: string,
   matchId: string
 ): Promise<MatchDetailsResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/scrape-match-details?url=${encodeURIComponent(url)}&matchId=${encodeURIComponent(matchId)}`, {
-      method: 'GET',
+    // Usa a API scrape-match-details para fazer fetch do HTML (evita CORS)
+    const scrapeResponse = await fetch(`${API_BASE_URL}/scrape-match-details`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ url, matchId }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
-      throw new Error(errorData.error || `Erro HTTP: ${response.status}`);
+    if (!scrapeResponse.ok) {
+      const errorData = await scrapeResponse.json().catch(() => ({ error: 'Erro desconhecido' }));
+      throw new Error(errorData.error || `Erro HTTP: ${scrapeResponse.status}`);
     }
 
-    const data: MatchDetailsResponse = await response.json();
-    return data;
+    const scrapeData = await scrapeResponse.json();
+    
+    // Se a API retornou HTML, processa via match-details
+    if (scrapeData.html) {
+      const processResponse = await fetch(`${API_BASE_URL}/match-details`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ html: scrapeData.html, matchId }),
+      });
+
+      if (!processResponse.ok) {
+        const errorData = await processResponse.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(errorData.error || `Erro HTTP: ${processResponse.status}`);
+      }
+
+      const data: MatchDetailsResponse = await processResponse.json();
+      return data;
+    }
+
+    // Se não retornou HTML, tenta fazer fetch direto (pode ter problemas de CORS)
+    try {
+      const htmlResponse = await fetch(url, {
+        mode: 'cors',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+
+      if (htmlResponse.ok) {
+        const html = await htmlResponse.text();
+        
+        const processResponse = await fetch(`${API_BASE_URL}/match-details`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ html, matchId }),
+        });
+
+        if (processResponse.ok) {
+          const data: MatchDetailsResponse = await processResponse.json();
+          return data;
+        }
+      }
+    } catch (corsError) {
+      console.warn('Erro de CORS ao fazer fetch direto:', corsError);
+    }
+
+    throw new Error('Não foi possível obter o HTML da página');
   } catch (error) {
     console.error('Erro ao fazer scraping dos detalhes:', error);
     throw error;
