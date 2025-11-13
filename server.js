@@ -109,26 +109,6 @@ async function setupApiRoutes() {
   }
 }
 
-// Serve arquivos estáticos do build do Vite
-app.use(express.static(join(__dirname, 'dist')));
-
-// Roteamento SPA - todas as rotas que não são /api/* servem index.html
-app.get('*', (req, res) => {
-  // Se for uma rota de API, não serve index.html
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API route not found' });
-  }
-  
-  // Serve index.html para todas as outras rotas (SPA routing)
-  const indexPath = join(__dirname, 'dist', 'index.html');
-  try {
-    const html = readFileSync(indexPath, 'utf-8');
-    res.send(html);
-  } catch (error) {
-    res.status(500).send('Error loading index.html');
-  }
-});
-
 // Inicia o servidor
 async function startServer() {
   try {
@@ -136,8 +116,32 @@ async function startServer() {
     console.log('📁 Diretório atual:', __dirname);
     console.log('📦 Node version:', process.version);
     
+    // IMPORTANTE: Configurar rotas da API PRIMEIRO
     await setupApiRoutes();
     console.log('✅ Rotas da API configuradas');
+    
+    // Serve arquivos estáticos do build do Vite (DEPOIS das rotas da API)
+    app.use(express.static(join(__dirname, 'dist')));
+    console.log('✅ Arquivos estáticos configurados');
+    
+    // Roteamento SPA - todas as rotas que não são /api/* servem index.html (POR ÚLTIMO)
+    app.get('*', (req, res) => {
+      // Se for uma rota de API, não serve index.html (não deveria chegar aqui se as rotas da API estiverem funcionando)
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API route not found' });
+      }
+      
+      // Serve index.html para todas as outras rotas (SPA routing)
+      const indexPath = join(__dirname, 'dist', 'index.html');
+      try {
+        const html = readFileSync(indexPath, 'utf-8');
+        res.send(html);
+      } catch (error) {
+        console.error('Erro ao carregar index.html:', error);
+        res.status(500).send('Error loading index.html');
+      }
+    });
+    console.log('✅ Roteamento SPA configurado');
     
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
