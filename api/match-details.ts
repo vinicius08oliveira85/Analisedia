@@ -1934,17 +1934,39 @@ export default async function handler(
         console.log(`[Goal Stats] Time B: Usando tabela disponível: "${teamBTable?.teamName}"`);
       }
       
-      console.log(`[Goal Stats] Tabela Time A: ${teamATable ? `"${teamATable.teamName}"` : 'NÃO ENCONTRADA'}`);
-      console.log(`[Goal Stats] Tabela Time B: ${teamBTable ? `"${teamBTable.teamName}"` : 'NÃO ENCONTRADA'}`);
+      console.log(`[Goal Stats] Tabela Time A: ${teamATable ? `"${teamATable.teamName}" (${teamATable.tableHtml.length} chars)` : 'NÃO ENCONTRADA'}`);
+      if (teamATable) {
+        const preview = teamATable.tableHtml.substring(0, 500).replace(/\s+/g, ' ');
+        console.log(`[Goal Stats] Preview tabela Time A (primeiros 500 chars): ${preview}`);
+      }
+      console.log(`[Goal Stats] Tabela Time B: ${teamBTable ? `"${teamBTable.teamName}" (${teamBTable.tableHtml.length} chars)` : 'NÃO ENCONTRADA'}`);
+      if (teamBTable) {
+        const preview = teamBTable.tableHtml.substring(0, 500).replace(/\s+/g, ' ');
+        console.log(`[Goal Stats] Preview tabela Time B (primeiros 500 chars): ${preview}`);
+      }
+      
+      if (!teamATable) {
+        console.error(`[Goal Stats] ⚠⚠⚠ ERRO: Nenhuma tabela encontrada para Time A (${matchInfo.teamA})!`);
+        console.error(`[Goal Stats] Tabelas disponíveis: ${allGoalStatsTables.map(t => `"${t.teamName}"`).join(', ')}`);
+      }
+      if (!teamBTable) {
+        console.error(`[Goal Stats] ⚠⚠⚠ ERRO: Nenhuma tabela encontrada para Time B (${matchInfo.teamB})!`);
+        console.error(`[Goal Stats] Tabelas disponíveis: ${allGoalStatsTables.map(t => `"${t.teamName}"`).join(', ')}`);
+      }
       
       // Extrai stats de cada tabela
+      console.log(`[Goal Stats] Extraindo stats do Time A (${matchInfo.teamA})...`);
       const teamAGoalStatsHome = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'home') : extractGoalStats(html, matchInfo.teamA, 'home');
       const teamAGoalStatsAway = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'away') : extractGoalStats(html, matchInfo.teamA, 'away');
       const teamAGoalStatsGlobal = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'global') : extractGoalStats(html, matchInfo.teamA, 'global');
       
+      console.log(`[Goal Stats] Extraindo stats do Time B (${matchInfo.teamB})...`);
       const teamBGoalStatsHome = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'home') : extractGoalStats(html, matchInfo.teamB, 'home');
       const teamBGoalStatsAway = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'away') : extractGoalStats(html, matchInfo.teamB, 'away');
       const teamBGoalStatsGlobal = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'global') : extractGoalStats(html, matchInfo.teamB, 'global');
+      
+      console.log(`[Goal Stats] RESULTADO IMEDIATO Time A Home: Marcados=${teamAGoalStatsHome.avgGoalsScored}, Sofridos=${teamAGoalStatsHome.avgGoalsConceded}`);
+      console.log(`[Goal Stats] RESULTADO IMEDIATO Time B Home: Marcados=${teamBGoalStatsHome.avgGoalsScored}, Sofridos=${teamBGoalStatsHome.avgGoalsConceded}`);
       
       const teamAGoalStats = {
         home: teamAGoalStatsHome,
