@@ -20,9 +20,15 @@ Este projeto está configurado para fazer deploy automático no Railway via GitH
 
 ### 2. Obter IDs do Projeto e Serviço
 
+**Project ID:**
 1. No Railway Dashboard, abra seu projeto
 2. O **Project ID** está na URL: `https://railway.app/project/{PROJECT_ID}`
-3. Para o **Service ID**, clique no serviço e veja na URL: `https://railway.app/project/{PROJECT_ID}/service/{SERVICE_ID}`
+3. Ou use o comando: `railway project` (se tiver Railway CLI instalado)
+
+**Service ID (opcional):**
+1. Clique no serviço dentro do projeto
+2. O **Service ID** está na URL: `https://railway.app/project/{PROJECT_ID}/service/{SERVICE_ID}`
+3. Se não informar, o Railway usa o serviço padrão do projeto
 
 ### 3. Configurar Secrets no GitHub
 

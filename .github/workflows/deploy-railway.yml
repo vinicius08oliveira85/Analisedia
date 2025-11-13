@@ -42,7 +42,15 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           echo "🚀 Iniciando deploy para Railway..."
-          railway link --token $RAILWAY_TOKEN ${{ secrets.RAILWAY_PROJECT_ID }}
-          railway up --token $RAILWAY_TOKEN --service ${{ secrets.RAILWAY_SERVICE_ID || '' }}
+          # Linka o projeto ao Railway (se necessário)
+          if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+            railway link --token $RAILWAY_TOKEN ${{ secrets.RAILWAY_PROJECT_ID }} || true
+          fi
+          # Faz o deploy
+          if [ -n "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then
+            railway up --token $RAILWAY_TOKEN --service ${{ secrets.RAILWAY_SERVICE_ID }}
+          else
+            railway up --token $RAILWAY_TOKEN
+          fi
           echo "✅ Deploy concluído com sucesso!"
 
