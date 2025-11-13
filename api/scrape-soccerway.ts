@@ -6,8 +6,39 @@ interface LeagueGroup {
   matches: MatchDetails[];
 }
 
-// Função para fazer fetch do HTML do site
-async function fetchSiteHTML(url: string): Promise<string> {
+// Função para fazer fetch do HTML do site (com suporte a renderização JS)
+async function fetchSiteHTML(url: string, useRenderer: boolean = false): Promise<string> {
+  // Se o renderizador estiver disponível e solicitado, usa ele
+  if (useRenderer && process.env.RENDERER_SERVICE_URL) {
+    try {
+      console.log('[scrape-soccerway] Usando serviço de renderização para:', url);
+      const renderResponse = await fetch(`${process.env.RENDERER_SERVICE_URL}/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url,
+          wait_time: 5000, // Aguarda 5s para SPAs carregarem
+          timeout: 30000,
+        }),
+      });
+
+      if (renderResponse.ok) {
+        const result = await renderResponse.json();
+        if (result.success && result.html) {
+          console.log('[scrape-soccerway] HTML renderizado obtido com sucesso');
+          return result.html;
+        }
+      }
+      console.warn('[scrape-soccerway] Renderizador falhou, usando fallback');
+    } catch (renderError) {
+      console.warn('[scrape-soccerway] Erro ao usar renderizador:', renderError);
+      // Continua com fallback
+    }
+  }
+
+  // Fallback: fetch normal
   try {
     const response = await fetch(url, {
       headers: {
@@ -549,9 +580,10 @@ export default async function handler(
         htmlContent = html;
         console.log('[scrape-soccerway] HTML fornecido, tamanho:', htmlContent.length);
       } else {
-        // Caso contrário, faz fetch
+        // Caso contrário, faz fetch (tenta usar renderizador se disponível)
         try {
-          htmlContent = await fetchSiteHTML(url);
+          const useRenderer = url.includes('soccerway.com') || url.includes('sokkerpro.com');
+          htmlContent = await fetchSiteHTML(url, useRenderer);
           console.log('[scrape-soccerway] HTML obtido, tamanho:', htmlContent.length);
         } catch (fetchError) {
           console.error('[scrape-soccerway] Erro ao fazer fetch:', fetchError);
