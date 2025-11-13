@@ -30,8 +30,15 @@ export async function scrapeMatchesFromSite(url?: string): Promise<ScrapeMatches
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
-      throw new Error(errorData.error || `Erro HTTP: ${response.status}`);
+      const errorData = await response.json().catch(() => ({ 
+        error: 'Erro desconhecido',
+        message: `Erro HTTP: ${response.status}`,
+        details: `Status: ${response.status}`
+      }));
+      
+      const error = new Error(errorData.message || errorData.error || `Erro HTTP: ${response.status}`);
+      (error as any).details = errorData.details || errorData.error;
+      throw error;
     }
 
     const data: ScrapeMatchesResponse = await response.json();

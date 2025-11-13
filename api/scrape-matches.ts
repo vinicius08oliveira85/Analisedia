@@ -262,8 +262,19 @@ export default async function handler(
       console.log('Fazendo scraping do site:', url);
       
       // Faz fetch do HTML do site
-      const html = await fetchSiteHTML(url);
-      console.log('HTML obtido, tamanho:', html.length);
+      let html: string;
+      try {
+        html = await fetchSiteHTML(url);
+        console.log('HTML obtido, tamanho:', html.length);
+      } catch (fetchError) {
+        console.error('Erro ao fazer fetch:', fetchError);
+        const errorMessage = fetchError instanceof Error ? fetchError.message : 'Erro desconhecido ao fazer fetch';
+        return res.status(500).json({ 
+          error: 'Erro ao fazer scraping do site',
+          details: errorMessage,
+          message: `Não foi possível acessar o site: ${errorMessage}`
+        });
+      }
       
       // Extrai os eventos do HTML
       const events = extractMatchesFromHTML(html);
@@ -319,9 +330,14 @@ export default async function handler(
       });
     } catch (error) {
       console.error('Erro ao fazer scraping:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      console.error('Stack trace:', errorStack);
+      
       return res.status(500).json({ 
         error: 'Erro ao fazer scraping do site',
-        details: error instanceof Error ? error.message : 'Erro desconhecido'
+        details: errorMessage,
+        message: `Erro ao processar o site: ${errorMessage}`
       });
     }
   }

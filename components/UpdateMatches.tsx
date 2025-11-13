@@ -74,7 +74,20 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
         onLeaguesUpdated(result.leagues);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao fazer scraping do site';
+      console.error('Erro ao fazer scraping:', error);
+      let errorMessage = 'Erro ao fazer scraping do site';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      
+      // Tenta extrair detalhes da resposta se disponível
+      if (error && typeof error === 'object' && 'details' in error) {
+        errorMessage = `${errorMessage}: ${error.details}`;
+      }
+      
       setMessage({ type: 'error', text: errorMessage });
     } finally {
       setIsUpdating(false);
