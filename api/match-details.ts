@@ -1101,6 +1101,7 @@ function extractStandings(html: string, competitionName?: string): Standing[] {
 }
 
 // Função ALTERNATIVA: Busca goal stats diretamente no HTML usando padrões de texto
+// Esta função é mais agressiva e busca valores em qualquer lugar do HTML próximo ao nome do time
 function extractGoalStatsDirectly(html: string, teamName: string, scope: 'home' | 'away' | 'global'): TeamGoalStats {
   const defaultStats: TeamGoalStats = {
     avgGoalsScored: 0,
@@ -1116,62 +1117,102 @@ function extractGoalStatsDirectly(html: string, teamName: string, scope: 'home' 
     }
   };
 
-  console.log(`[extractGoalStatsDirectly] Buscando diretamente no HTML para ${teamName} (${scope})`);
+  console.log(`[extractGoalStatsDirectly] ===== Buscando diretamente no HTML para ${teamName} (${scope}) =====`);
   
   const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
   const escapedName = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  console.log(`[extractGoalStatsDirectly] Nome do time: "${actualTeamName}" (escaped: "${escapedName}")`);
   
-  // Busca seção próxima ao nome do time
-  const teamSectionRegex = new RegExp(`${escapedName}[\\s\\S]{0,2000}(?:Média de gols|> 2,5|< 2,5|Jogos sem)`, 'i');
-  const teamSection = html.match(teamSectionRegex);
+  // Busca TODAS as ocorrências do nome do time no HTML e pega seções maiores ao redor
+  const teamNameMatches = [...html.matchAll(new RegExp(escapedName, 'gi'))];
+  console.log(`[extractGoalStatsDirectly] Encontradas ${teamNameMatches.length} ocorrências do nome do time no HTML`);
   
-  if (!teamSection) {
-    console.log(`[extractGoalStatsDirectly] Seção do time não encontrada`);
+  if (teamNameMatches.length === 0) {
+    console.error(`[extractGoalStatsDirectly] ⚠ Nome do time não encontrado no HTML!`);
     return defaultStats;
   }
   
-  const searchSection = teamSection[0];
-  
-  // Padrões para buscar valores diretamente no texto
-  const patterns = {
-    avgGoalsScored: [
-      new RegExp(`média[\\s]*de[\\s]*gols[\\s]*marcados[^<]*?${escapedName}[^<]*?([\\d,]+)`, 'i'),
-      new RegExp(`${escapedName}[^<]*?média[\\s]*de[\\s]*gols[\\s]*marcados[^<]*?([\\d,]+)`, 'i'),
-      /média[\\s]*de[\\s]*gols[\\s]*marcados[^<]*?casa[^<]*?([\d,]+)/i,
-      /média[\\s]*de[\\s]*gols[\\s]*marcados[^<]*?fora[^<]*?([\d,]+)/i,
-    ],
-    avgGoalsConceded: [
-      new RegExp(`média[\\s]*de[\\s]*gols[\\s]*sofridos[^<]*?${escapedName}[^<]*?([\\d,]+)`, 'i'),
-      new RegExp(`${escapedName}[^<]*?média[\\s]*de[\\s]*gols[\\s]*sofridos[^<]*?([\\d,]+)`, 'i'),
-      /média[\\s]*de[\\s]*gols[\\s]*sofridos[^<]*?casa[^<]*?([\d,]+)/i,
-      /média[\\s]*de[\\s]*gols[\\s]*sofridos[^<]*?fora[^<]*?([\d,]+)/i,
-    ],
-    over25Pct: [
-      /mais[\\s]*de[\\s]*2[\\s]*,?[\\s]*5[^<]*?([\d]+)[\\s]*%/i,
-      />[\\s]*2[\\s]*,?[\\s]*5[^<]*?([\d]+)[\\s]*%/i,
-      /over[\\s]*2[\\s]*\\.?[\\s]*5[^<]*?([\d]+)[\\s]*%/i,
-    ],
-    under25Pct: [
-      /menos[\\s]*de[\\s]*2[\\s]*,?[\\s]*5[^<]*?([\d]+)[\\s]*%/i,
-      /<[\\s]*2[\\s]*,?[\\s]*5[^<]*?([\d]+)[\\s]*%/i,
-      /under[\\s]*2[\\s]*\\.?[\\s]*5[^<]*?([\d]+)[\\s]*%/i,
-    ],
-  };
-  
-  // Busca valores
-  for (const [key, patternList] of Object.entries(patterns)) {
-    for (const pattern of patternList) {
-      const match = searchSection.match(pattern);
-      if (match && match[1]) {
-        const value = parseNumericValue(match[1]);
-        if (value > 0) {
-          (defaultStats as any)[key] = value;
-          console.log(`[extractGoalStatsDirectly] ✓ ${key}: ${value} (de "${match[1]}")`);
-          break;
+  // Para cada ocorrência, busca uma seção maior ao redor (5000 caracteres)
+  for (let i = 0; i < Math.min(teamNameMatches.length, 3); i++) {
+    const match = teamNameMatches[i];
+    const start = Math.max(0, match.index! - 1000);
+    const end = Math.min(html.length, match.index! + match[0].length + 5000);
+    const section = html.substring(start, end);
+    
+    console.log(`[extractGoalStatsDirectly] Analisando seção ${i + 1} (${section.length} chars)`);
+    
+    // Padrões mais flexíveis - busca números próximos a textos específicos
+    const patterns = [
+      // Média gols marcados
+      {
+        key: 'avgGoalsScored',
+        patterns: [
+          /média[^<]*gols[^<]*marcados[^<]{0,200}([\d,]+)/i,
+          /média[^<]*gols[^<]*marcados[^<]{0,200}casa[^<]{0,200}([\d,]+)/i,
+          /média[^<]*gols[^<]*marcados[^<]{0,200}fora[^<]{0,200}([\d,]+)/i,
+          new RegExp(`${escapedName}[^<]{0,500}média[^<]{0,200}gols[^<]{0,200}marcados[^<]{0,200}([\\d,]+)`, 'i'),
+        ]
+      },
+      // Média gols sofridos
+      {
+        key: 'avgGoalsConceded',
+        patterns: [
+          /média[^<]*gols[^<]*sofridos[^<]{0,200}([\d,]+)/i,
+          /média[^<]*gols[^<]*sofridos[^<]{0,200}casa[^<]{0,200}([\d,]+)/i,
+          /média[^<]*gols[^<]*sofridos[^<]{0,200}fora[^<]{0,200}([\d,]+)/i,
+          new RegExp(`${escapedName}[^<]{0,500}média[^<]{0,200}gols[^<]{0,200}sofridos[^<]{0,200}([\\d,]+)`, 'i'),
+        ]
+      },
+      // > 2.5
+      {
+        key: 'over25Pct',
+        patterns: [
+          />[^<]*2[^<]*,?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
+          /mais[^<]*de[^<]*2[^<]*,?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
+          /over[^<]*2[^<]*\.?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
+        ]
+      },
+      // < 2.5
+      {
+        key: 'under25Pct',
+        patterns: [
+          /<[^<]*2[^<]*,?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
+          /menos[^<]*de[^<]*2[^<]*,?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
+          /under[^<]*2[^<]*\.?[^<]*5[^<]{0,200}([\d]+)[^<]*%/i,
+        ]
+      },
+    ];
+    
+    // Busca valores em cada padrão
+    for (const { key, patterns: patternList } of patterns) {
+      if ((defaultStats as any)[key] > 0) continue; // Já encontrou valor
+      
+      for (const pattern of patternList) {
+        const match = section.match(pattern);
+        if (match && match[1]) {
+          const value = parseNumericValue(match[1]);
+          if (value > 0) {
+            (defaultStats as any)[key] = value;
+            console.log(`[extractGoalStatsDirectly] ✓✓✓ ${key}: ${value} (de "${match[1]}" na seção ${i + 1})`);
+            break;
+          }
         }
       }
     }
+    
+    // Se encontrou valores principais, pode parar
+    if (defaultStats.avgGoalsScored > 0 && defaultStats.avgGoalsConceded > 0) {
+      console.log(`[extractGoalStatsDirectly] Valores principais encontrados na seção ${i + 1}, parando busca`);
+      break;
+    }
   }
+  
+  // Calcula média total
+  if (defaultStats.avgTotalGoals === 0 && defaultStats.avgGoalsScored > 0 && defaultStats.avgGoalsConceded > 0) {
+    defaultStats.avgTotalGoals = defaultStats.avgGoalsScored + defaultStats.avgGoalsConceded;
+  }
+  
+  console.log(`[extractGoalStatsDirectly] RESULTADO FINAL: Marcados=${defaultStats.avgGoalsScored}, Sofridos=${defaultStats.avgGoalsConceded}, Total=${defaultStats.avgTotalGoals}`);
   
   return defaultStats;
 }
@@ -2096,34 +2137,38 @@ export default async function handler(
         console.error(`[Goal Stats] Tabelas disponíveis: ${allGoalStatsTables.map(t => `"${t.teamName}"`).join(', ')}`);
       }
       
-      // Extrai stats de cada tabela
-      console.log(`[Goal Stats] Extraindo stats do Time A (${matchInfo.teamA})...`);
-      let teamAGoalStatsHome = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'home') : extractGoalStats(html, matchInfo.teamA, 'home');
-      let teamAGoalStatsAway = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'away') : extractGoalStats(html, matchInfo.teamA, 'away');
-      let teamAGoalStatsGlobal = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'global') : extractGoalStats(html, matchInfo.teamA, 'global');
+      // NOVA ABORDAGEM: Usa busca direta como método PRINCIPAL (mais confiável)
+      console.log(`[Goal Stats] ===== Extraindo stats usando busca direta no HTML =====`);
       
-      // Se os valores estão zerados, tenta busca direta no HTML
-      if (teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0) {
-        console.log(`[Goal Stats] Time A: Valores zerados, tentando busca direta no HTML...`);
-        const directStats = extractGoalStatsDirectly(html, matchInfo.teamA, 'home');
-        if (directStats.avgGoalsScored > 0 || directStats.avgGoalsConceded > 0) {
-          teamAGoalStatsHome = directStats;
-          console.log(`[Goal Stats] Time A: Usando dados da busca direta!`);
+      // Time A - busca direta
+      console.log(`[Goal Stats] Extraindo stats do Time A (${matchInfo.teamA})...`);
+      let teamAGoalStatsHome = extractGoalStatsDirectly(html, matchInfo.teamA, 'home');
+      let teamAGoalStatsAway = extractGoalStatsDirectly(html, matchInfo.teamA, 'away');
+      let teamAGoalStatsGlobal = extractGoalStatsDirectly(html, matchInfo.teamA, 'global');
+      
+      // Se busca direta não encontrou, tenta tabelas como fallback
+      if (teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0 && teamATable) {
+        console.log(`[Goal Stats] Time A: Busca direta falhou, tentando tabela...`);
+        const tableStats = extractGoalStatsFromTable(teamATable.tableHtml, 'home');
+        if (tableStats.avgGoalsScored > 0 || tableStats.avgGoalsConceded > 0) {
+          teamAGoalStatsHome = tableStats;
+          console.log(`[Goal Stats] Time A: Usando dados da tabela!`);
         }
       }
       
+      // Time B - busca direta
       console.log(`[Goal Stats] Extraindo stats do Time B (${matchInfo.teamB})...`);
-      let teamBGoalStatsHome = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'home') : extractGoalStats(html, matchInfo.teamB, 'home');
-      let teamBGoalStatsAway = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'away') : extractGoalStats(html, matchInfo.teamB, 'away');
-      let teamBGoalStatsGlobal = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'global') : extractGoalStats(html, matchInfo.teamB, 'global');
+      let teamBGoalStatsHome = extractGoalStatsDirectly(html, matchInfo.teamB, 'home');
+      let teamBGoalStatsAway = extractGoalStatsDirectly(html, matchInfo.teamB, 'away');
+      let teamBGoalStatsGlobal = extractGoalStatsDirectly(html, matchInfo.teamB, 'global');
       
-      // Se os valores estão zerados, tenta busca direta no HTML
-      if (teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0) {
-        console.log(`[Goal Stats] Time B: Valores zerados, tentando busca direta no HTML...`);
-        const directStats = extractGoalStatsDirectly(html, matchInfo.teamB, 'home');
-        if (directStats.avgGoalsScored > 0 || directStats.avgGoalsConceded > 0) {
-          teamBGoalStatsHome = directStats;
-          console.log(`[Goal Stats] Time B: Usando dados da busca direta!`);
+      // Se busca direta não encontrou, tenta tabelas como fallback
+      if (teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0 && teamBTable) {
+        console.log(`[Goal Stats] Time B: Busca direta falhou, tentando tabela...`);
+        const tableStats = extractGoalStatsFromTable(teamBTable.tableHtml, 'home');
+        if (tableStats.avgGoalsScored > 0 || tableStats.avgGoalsConceded > 0) {
+          teamBGoalStatsHome = tableStats;
+          console.log(`[Goal Stats] Time B: Usando dados da tabela!`);
         }
       }
       
