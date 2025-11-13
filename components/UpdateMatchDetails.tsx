@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { updateMatchDetailsFromHTML, uploadMatchDetailsFile, applyMatchDetailsUpdate, scrapeMatchDetailsFromURL, type MatchDetailsResponse } from '../services/matchDetailsService';
+import { findLeagueForCompetition } from '../services/leagueService';
 import type { MatchDetails } from '../types';
 
 interface UpdateMatchDetailsProps {
@@ -10,9 +11,19 @@ interface UpdateMatchDetailsProps {
 export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, onDetailsUpdated }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(match.matchInfo.url || '');
   const [competitionUrl, setCompetitionUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Busca liga cadastrada para a competição da partida
+  useEffect(() => {
+    if (match.matchInfo.competition) {
+      const league = findLeagueForCompetition(match.matchInfo.competition);
+      if (league && league.competitionUrl) {
+        setCompetitionUrl(league.competitionUrl);
+      }
+    }
+  }, [match.matchInfo.competition]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
