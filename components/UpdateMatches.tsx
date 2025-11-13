@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { updateMatchesFromHTML, uploadMatchesFile, type UpdateMatchesResponse } from '../services/matchesService';
-import { scrapeMatchesFromSite } from '../services/scrapeService';
+import { scrapeMatchesFromSite, scrapeMatchesFromSokkerPro } from '../services/scrapeService';
 import type { MatchDetails } from '../types';
 
 interface UpdateMatchesProps {
@@ -65,9 +65,9 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
 
     try {
       const result = await scrapeMatchesFromSite();
-      setMessage({ 
-        type: 'success', 
-        text: `${result.message}. ${result.leagues.length} ligas encontradas.` 
+      setMessage({
+        type: 'success',
+        text: `${result.message}. ${result.leagues.length} ligas encontradas.`
       });
       onMatchesUpdated(result.matches);
       if (onLeaguesUpdated && result.leagues.length > 0) {
@@ -76,18 +76,52 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
     } catch (error) {
       console.error('Erro ao fazer scraping:', error);
       let errorMessage = 'Erro ao fazer scraping do site';
-      
+
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null && 'message' in error) {
         errorMessage = String(error.message);
       }
-      
+
       // Tenta extrair detalhes da resposta se disponível
       if (error && typeof error === 'object' && 'details' in error) {
         errorMessage = `${errorMessage}: ${error.details}`;
       }
-      
+
+      setMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleScrapeSokkerPro = async () => {
+    setIsUpdating(true);
+    setMessage(null);
+
+    try {
+      const result = await scrapeMatchesFromSokkerPro();
+      setMessage({
+        type: 'success',
+        text: `${result.message}. ${result.leagues.length} ligas encontradas.`
+      });
+      onMatchesUpdated(result.matches);
+      if (onLeaguesUpdated && result.leagues.length > 0) {
+        onLeaguesUpdated(result.leagues);
+      }
+    } catch (error) {
+      console.error('Erro ao fazer scraping do sokkerpro:', error);
+      let errorMessage = 'Erro ao fazer scraping do sokkerpro.com';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+
+      if (error && typeof error === 'object' && 'details' in error) {
+        errorMessage = `${errorMessage}: ${error.details}`;
+      }
+
       setMessage({ type: 'error', text: errorMessage });
     } finally {
       setIsUpdating(false);
@@ -106,6 +140,14 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
             title="Faz scraping direto do site academiadasapostasbrasil.com"
           >
             {isUpdating ? 'Processando...' : '🔄 Buscar do Site'}
+          </button>
+          <button
+            onClick={handleScrapeSokkerPro}
+            disabled={isUpdating}
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            title="Faz scraping direto do site sokkerpro.com"
+          >
+            {isUpdating ? 'Processando...' : '⚽ Buscar do SokkerPro'}
           </button>
           <button
             onClick={handlePasteHTML}

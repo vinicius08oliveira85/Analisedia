@@ -1,0 +1,486 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { MatchDetails } from '../types';
+
+interface LeagueGroup {
+  leagueName: string;
+  matches: MatchDetails[];
+}
+
+// Função para fazer fetch do HTML do site
+async function fetchSiteHTML(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+        'DNT': '1',
+        'Referer': 'https://www.google.com/',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error(`Acesso negado (403): O site está bloqueando requisições automáticas. Use "Colar HTML" ou "Upload de Arquivo" como alternativa.`);
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.text();
+  } catch (error) {
+    console.error('Erro ao fazer fetch do site:', error);
+    throw error;
+  }
+}
+
+// Função para limpar texto HTML
+function cleanHTMLText(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Função para extrair jogos do sokkerpro.com
+function extractMatchesFromSokkerPro(html: string): MatchDetails[] {
+  const matches: MatchDetails[] = [];
+  
+  // Estratégia 1: Busca por JSON-LD (Schema.org) - igual ao sistema atual
+  const jsonScriptRegex = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
+  let scriptMatch;
+  
+  while ((scriptMatch = jsonScriptRegex.exec(html)) !== null) {
+    const scriptContent = scriptMatch[1].trim();
+    if (!scriptContent) continue;
+    
+    try {
+      const data: any = JSON.parse(scriptContent);
+      
+      if (data['@graph'] && Array.isArray(data['@graph'])) {
+        const sportsEvents = data['@graph'].filter((event: any) => 
+          event && event['@type'] === 'SportsEvent'
+        );
+        if (sportsEvents.length > 0) {
+          for (const event of sportsEvents) {
+            const match = convertToMatchDetails(event);
+            if (match) matches.push(match);
+          }
+          continue;
+        }
+      }
+      
+      if (data['@type'] === 'SportsEvent') {
+        const match = convertToMatchDetails(data);
+        if (match) matches.push(match);
+      }
+    } catch (error) {
+      // Continua para próxima estratégia
+    }
+  }
+  
+  // Estratégia 2: Busca por tabelas HTML com jogos
+  if (matches.length === 0) {
+    const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
+    let tableMatch;
+    
+    while ((tableMatch = tableRegex.exec(html)) !== null) {
+      const tableHtml = tableMatch[1];
+      
+      // Verifica se a tabela parece conter jogos (tem times, datas, etc)
+      if (!tableHtml.includes('vs') && !tableHtml.includes('x') && !tableHtml.includes(':')) {
+        continue;
+      }
+      
+      const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+      let rowMatch;
+      
+      while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
+        const rowHtml = rowMatch[1];
+        
+        // Extrai células
+        const cells: string[] = [];
+        const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+        let cellMatch;
+        
+        while ((cellMatch = cellRegex.exec(rowHtml)) !== null) {
+          cells.push(cleanHTMLText(cellMatch[1]));
+        }
+        
+        if (cells.length >= 3) {
+          // Tenta identificar times, data, hora
+          const match = parseMatchFromCells(cells, html);
+          if (match) matches.push(match);
+        }
+      }
+    }
+  }
+  
+  // Estratégia 3: Busca por divs/cards de jogos
+  if (matches.length === 0) {
+    const matchCardRegex = /<div[^>]*(?:class|id)=["'][^"']*(?:match|game|jogo|fixture)[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi;
+    let cardMatch;
+    
+    while ((cardMatch = matchCardRegex.exec(html)) !== null) {
+      const cardHtml = cardMatch[1];
+      const match = parseMatchFromCard(cardHtml, html);
+      if (match) matches.push(match);
+    }
+  }
+  
+  return matches;
+}
+
+// Função para converter SportsEvent para MatchDetails
+function convertToMatchDetails(event: any): MatchDetails | null {
+  try {
+    if (!event.homeTeam || !event.awayTeam || !event.startDate) {
+      return null;
+    }
+    
+    const startDate = new Date(event.startDate);
+    const dateStr = startDate.toISOString().split('T')[0];
+    const timeStr = startDate.toTimeString().split(' ')[0].substring(0, 5);
+    
+    const matchId = `sokkerpro_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return {
+      id: matchId,
+      teamA: {
+        name: event.homeTeam.name || 'Time A',
+        logo: event.homeTeam.image || ''
+      },
+      teamB: {
+        name: event.awayTeam.name || 'Time B',
+        logo: event.awayTeam.image || ''
+      },
+      matchInfo: {
+        date: dateStr,
+        time: timeStr,
+        competition: event.sport || 'Competição',
+        url: event.url || undefined
+      },
+      h2hData: [],
+      teamAForm: [],
+      teamBForm: [],
+      standingsData: [],
+      teamAGoalStats: {
+        home: {
+          avgGoalsScored: 0,
+          avgGoalsConceded: 0,
+          avgTotalGoals: 0,
+          noGoalsScoredPct: 0,
+          noGoalsConcededPct: 0,
+          over25Pct: 0,
+          under25Pct: 0,
+          goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] }
+        },
+        away: {
+          avgGoalsScored: 0,
+          avgGoalsConceded: 0,
+          avgTotalGoals: 0,
+          noGoalsScoredPct: 0,
+          noGoalsConcededPct: 0,
+          over25Pct: 0,
+          under25Pct: 0,
+          goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] }
+        },
+        global: {
+          avgGoalsScored: 0,
+          avgGoalsConceded: 0,
+          avgTotalGoals: 0,
+          noGoalsScoredPct: 0,
+          noGoalsConcededPct: 0,
+          over25Pct: 0,
+          under25Pct: 0,
+          goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] }
+        }
+      },
+      teamBGoalStats: {
+        home: {
+          avgGoalsScored: 0,
+          avgGoalsConceded: 0,
+          avgTotalGoals: 0,
+          noGoalsScoredPct: 0,
+          noGoalsConcededPct: 0,
+          over25Pct: 0,
+          under25Pct: 0,
+          goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] }
+        },
+        away: {
+          avgGoalsScored: 0,
+          avgGoalsConceded: 0,
+          avgTotalGoals: 0,
+          noGoalsScoredPct: 0,
+          noGoalsConcededPct: 0,
+          over25Pct: 0,
+          under25Pct: 0,
+          goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] }
+        },
+        global: {
+          avgGoalsScored: 0,
+          avgGoalsConceded: 0,
+          avgTotalGoals: 0,
+          noGoalsScoredPct: 0,
+          noGoalsConcededPct: 0,
+          over25Pct: 0,
+          under25Pct: 0,
+          goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] }
+        }
+      },
+      teamAStreaks: {
+        home: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 },
+        away: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 },
+        global: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 }
+      },
+      teamBStreaks: {
+        home: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 },
+        away: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 },
+        global: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 }
+      },
+      teamAOpponentAnalysis: { home: [], away: [], global: [] },
+      teamBOpponentAnalysis: { home: [], away: [], global: [] },
+      teamAGoalPatterns: {
+        home: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } },
+        away: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } },
+        global: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } }
+      },
+      teamBGoalPatterns: {
+        home: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } },
+        away: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } },
+        global: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } }
+      },
+      teamACorrectScores: { home: { ht: [], ft: [] }, away: { ht: [], ft: [] }, global: { ht: [], ft: [] } },
+      teamBCorrectScores: { home: { ht: [], ft: [] }, away: { ht: [], ft: [] }, global: { ht: [], ft: [] } }
+    };
+  } catch (error) {
+    console.error('Erro ao converter evento:', error);
+    return null;
+  }
+}
+
+// Função para parsear jogo de células de tabela
+function parseMatchFromCells(cells: string[], html: string): MatchDetails | null {
+  // Implementação básica - pode ser melhorada conforme a estrutura do sokkerpro
+  // Procura por padrões como: "Time A vs Time B", "Time A x Time B", etc.
+  
+  let teamA = '';
+  let teamB = '';
+  let date = '';
+  let time = '';
+  let competition = '';
+  
+  for (const cell of cells) {
+    // Procura por separadores de times
+    if (cell.includes(' vs ') || cell.includes(' x ') || cell.includes(' - ')) {
+      const parts = cell.split(/ vs | x | - /);
+      if (parts.length === 2) {
+        teamA = parts[0].trim();
+        teamB = parts[1].trim();
+      }
+    }
+    
+    // Procura por data (formato DD/MM/YYYY ou similar)
+    const dateMatch = cell.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
+    if (dateMatch) {
+      date = dateMatch[1];
+    }
+    
+    // Procura por hora (formato HH:MM)
+    const timeMatch = cell.match(/(\d{1,2}:\d{2})/);
+    if (timeMatch) {
+      time = timeMatch[1];
+    }
+  }
+  
+  if (!teamA || !teamB) {
+    return null;
+  }
+  
+  // Cria MatchDetails básico
+  const matchId = `sokkerpro_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Converte data para formato ISO se necessário
+  let dateStr = new Date().toISOString().split('T')[0];
+  if (date) {
+    try {
+      const [day, month, year] = date.split(/[\/\-]/);
+      const fullYear = year.length === 2 ? `20${year}` : year;
+      dateStr = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    } catch (e) {
+      // Mantém data atual
+    }
+  }
+  
+  return {
+    id: matchId,
+    teamA: { name: teamA, logo: '' },
+    teamB: { name: teamB, logo: '' },
+    matchInfo: {
+      date: dateStr,
+      time: time || '00:00',
+      competition: competition || 'Competição',
+    },
+    h2hData: [],
+    teamAForm: [],
+    teamBForm: [],
+    standingsData: [],
+    teamAGoalStats: {
+      home: { avgGoalsScored: 0, avgGoalsConceded: 0, avgTotalGoals: 0, noGoalsScoredPct: 0, noGoalsConcededPct: 0, over25Pct: 0, under25Pct: 0, goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] } },
+      away: { avgGoalsScored: 0, avgGoalsConceded: 0, avgTotalGoals: 0, noGoalsScoredPct: 0, noGoalsConcededPct: 0, over25Pct: 0, under25Pct: 0, goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] } },
+      global: { avgGoalsScored: 0, avgGoalsConceded: 0, avgTotalGoals: 0, noGoalsScoredPct: 0, noGoalsConcededPct: 0, over25Pct: 0, under25Pct: 0, goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] } }
+    },
+    teamBGoalStats: {
+      home: { avgGoalsScored: 0, avgGoalsConceded: 0, avgTotalGoals: 0, noGoalsScoredPct: 0, noGoalsConcededPct: 0, over25Pct: 0, under25Pct: 0, goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] } },
+      away: { avgGoalsScored: 0, avgGoalsConceded: 0, avgTotalGoals: 0, noGoalsScoredPct: 0, noGoalsConcededPct: 0, over25Pct: 0, under25Pct: 0, goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] } },
+      global: { avgGoalsScored: 0, avgGoalsConceded: 0, avgTotalGoals: 0, noGoalsScoredPct: 0, noGoalsConcededPct: 0, over25Pct: 0, under25Pct: 0, goalMoments: { scored: [0,0,0,0,0,0], conceded: [0,0,0,0,0,0] } }
+    },
+    teamAStreaks: {
+      home: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 },
+      away: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 },
+      global: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 }
+    },
+    teamBStreaks: {
+      home: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 },
+      away: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 },
+      global: { winStreak: 0, drawStreak: 0, lossStreak: 0, unbeatenStreak: 0, winlessStreak: 0, noDrawStreak: 0 }
+    },
+    teamAOpponentAnalysis: { home: [], away: [], global: [] },
+    teamBOpponentAnalysis: { home: [], away: [], global: [] },
+    teamAGoalPatterns: {
+      home: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } },
+      away: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } },
+      global: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } }
+    },
+    teamBGoalPatterns: {
+      home: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } },
+      away: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } },
+      global: { opensScore: { games: 0, total: 0, pct: 0 }, winsWhenOpening: { games: 0, total: 0, pct: 0 }, comebacks: { games: 0, total: 0, pct: 0 } }
+    },
+    teamACorrectScores: { home: { ht: [], ft: [] }, away: { ht: [], ft: [] }, global: { ht: [], ft: [] } },
+    teamBCorrectScores: { home: { ht: [], ft: [] }, away: { ht: [], ft: [] }, global: { ht: [], ft: [] } }
+  };
+}
+
+// Função para parsear jogo de card/div
+function parseMatchFromCard(cardHtml: string, fullHtml: string): MatchDetails | null {
+  // Implementação similar ao parseMatchFromCells
+  // Pode ser expandida conforme necessário
+  return null;
+}
+
+// Função para agrupar jogos por liga
+function groupMatchesByLeague(matches: MatchDetails[]): Map<string, MatchDetails[]> {
+  const leagueMap = new Map<string, MatchDetails[]>();
+  
+  for (const match of matches) {
+    const league = match.matchInfo.competition || 'Outras';
+    if (!leagueMap.has(league)) {
+      leagueMap.set(league, []);
+    }
+    leagueMap.get(league)!.push(match);
+  }
+  
+  return leagueMap;
+}
+
+export default async function handler(
+  req: VercelRequest,
+  res: VercelResponse
+) {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method === 'GET' || req.method === 'POST') {
+    try {
+      const url = req.query.url as string || req.body?.url || 'https://sokkerpro.com/';
+      const html = req.body?.html as string | undefined;
+      
+      console.log('[scrape-sokkerpro] Processando:', url);
+      
+      let htmlContent: string;
+      
+      if (html) {
+        // Se HTML foi fornecido no body, usa ele
+        htmlContent = html;
+        console.log('[scrape-sokkerpro] HTML fornecido, tamanho:', htmlContent.length);
+      } else {
+        // Caso contrário, faz fetch
+        try {
+          htmlContent = await fetchSiteHTML(url);
+          console.log('[scrape-sokkerpro] HTML obtido, tamanho:', htmlContent.length);
+        } catch (fetchError) {
+          console.error('[scrape-sokkerpro] Erro ao fazer fetch:', fetchError);
+          const errorMessage = fetchError instanceof Error ? fetchError.message : 'Erro desconhecido ao fazer fetch';
+          return res.status(500).json({ 
+            error: 'Erro ao fazer scraping do site',
+            details: errorMessage,
+            message: `Não foi possível acessar o site: ${errorMessage}`
+          });
+        }
+      }
+      
+      // Extrai os jogos
+      const matches = extractMatchesFromSokkerPro(htmlContent);
+      console.log('[scrape-sokkerpro] Jogos extraídos:', matches.length);
+      
+      if (matches.length === 0) {
+        return res.status(400).json({ 
+          error: 'Nenhum jogo encontrado no site',
+          debug: {
+            htmlLength: htmlContent.length,
+            hasScript: htmlContent.includes('application/ld+json'),
+            hasSportsEvent: htmlContent.includes('SportsEvent'),
+            sample: htmlContent.substring(0, 1000)
+          },
+          message: 'Nenhum jogo foi encontrado. Tente colar o HTML manualmente ou verifique se o site está acessível.'
+        });
+      }
+
+      // Agrupa por liga
+      const leagueMap = groupMatchesByLeague(matches);
+      const leagueGroups: LeagueGroup[] = Array.from(leagueMap.entries()).map(([leagueName, matches]) => ({
+        leagueName,
+        matches
+      }));
+
+      return res.status(200).json({
+        success: true,
+        matches: matches,
+        leagues: leagueGroups.map(g => g.leagueName),
+        leagueGroups: leagueGroups,
+        message: `${matches.length} jogos encontrados em ${leagueGroups.length} liga(s)`
+      });
+
+    } catch (error) {
+      console.error('[scrape-sokkerpro] Erro:', error);
+      return res.status(500).json({ 
+        error: 'Erro ao processar scraping',
+        details: error instanceof Error ? error.message : 'Erro desconhecido'
+      });
+    }
+  }
+
+  return res.status(405).json({ error: 'Método não permitido' });
+}
+

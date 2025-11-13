@@ -90,6 +90,9 @@ async function setupApiRoutes() {
     console.log('  - Importando process-competition...');
     const processCompetitionHandler = (await import('./api/process-competition.ts')).default;
 
+    console.log('  - Importando scrape-sokkerpro...');
+    const scrapeSokkerProHandler = (await import('./api/scrape-sokkerpro.ts')).default;
+
     console.log('✅ Todos os handlers importados com sucesso');
 
     // Registra as rotas da API com wrapper
@@ -104,6 +107,8 @@ async function setupApiRoutes() {
     app.get('/api/live-status', vercelWrapper(liveStatusHandler));
     app.post('/api/live-status', vercelWrapper(liveStatusHandler));
     app.post('/api/process-competition', vercelWrapper(processCompetitionHandler));
+    app.get('/api/scrape-sokkerpro', vercelWrapper(scrapeSokkerProHandler));
+    app.post('/api/scrape-sokkerpro', vercelWrapper(scrapeSokkerProHandler));
 
     console.log('✅ Rotas registradas');
   } catch (error) {
