@@ -1116,69 +1116,110 @@ function extractGoalStatsFromTable(tableHtml: string, scope: 'home' | 'away' | '
     }
   };
 
-  // Extrai linhas da tabela (formato: <tr class="even"> ou <tr class="odd">)
-  const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
-  const rows = tableHtml.match(rowRegex) || [];
+  console.log(`[extractGoalStatsFromTable] Extraindo stats do escopo ${scope} de tabela com ${tableHtml.length} chars`);
+
+  // Extrai linhas da tabela - múltiplos padrões
+  const rowPatterns = [
+    /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi,
+    /<tr[^>]*>([\s\S]*?)<\/tr>/gi,
+  ];
+  
+  let rows: string[] = [];
+  for (const rowRegex of rowPatterns) {
+    const matches = tableHtml.match(rowRegex);
+    if (matches && matches.length > 0) {
+      rows = matches;
+      break;
+    }
+  }
+  
+  console.log(`[extractGoalStatsFromTable] Encontradas ${rows.length} linhas`);
   
   for (const row of rows) {
-    // Extrai células da linha
-    const cells: string[] = [];
-    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    let cellMatch;
-    while ((cellMatch = cellRegex.exec(row)) !== null) {
-      let cellText = cellMatch[1]
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      cells.push(cellText);
+    // Pula cabeçalhos
+    if (row.includes('<thead') || row.includes('</thead>') || row.includes('<th')) {
+      continue;
     }
     
-    if (cells.length < 4) continue;
+    // Extrai células da linha
+    const cells: string[] = [];
+    const cellPatterns = [
+      /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi,
+      /<td[^>]*>([\s\S]*?)<\/td>/gi,
+    ];
     
-    // Primeira célula é o label (ex: "Média de gols marcados por jogo")
-    const label = cells[0].toLowerCase();
+    for (const cellRegex of cellPatterns) {
+      let cellMatch;
+      while ((cellMatch = cellRegex.exec(row)) !== null) {
+        const cellText = cleanHTMLText(cellMatch[1]);
+        if (cellText.trim()) {
+          cells.push(cellText);
+        }
+      }
+      if (cells.length > 0) break;
+    }
+    
+    if (cells.length < 3) {
+      continue;
+    }
+    
+    // Primeira célula é o label
+    const label = cells[0].toLowerCase().trim();
     
     // Determina qual coluna usar baseado no escopo
-    // Formato: [Label, Casa, Fora, Global] - índices: 0, 1, 2, 3
-    const colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 3;
-    const value = cells[colIndex] || '';
+    let colIndex: number;
+    if (cells.length >= 4) {
+      colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 3;
+    } else if (cells.length === 3) {
+      colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 1;
+    } else {
+      continue;
+    }
     
-    // Extrai valores numéricos
-    if (label.includes('média de gols marcados') || label.includes('média gols marcados')) {
-      const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+    const value = (cells[colIndex] || '').trim();
+    
+    // Extrai valores numéricos usando os parsers robustos
+    if (label.includes('média de gols marcados') || label.includes('média gols marcados') || (label.includes('média') && label.includes('marcados'))) {
+      const numValue = parseNumericValue(value);
       if (numValue > 0) {
         defaultStats.avgGoalsScored = numValue;
+        console.log(`[extractGoalStatsFromTable] ✓ Média gols marcados (${scope}): ${numValue} (de "${value}")`);
       }
-    } else if (label.includes('média de gols sofridos') || label.includes('média gols sofridos')) {
-      const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+    } else if (label.includes('média de gols sofridos') || label.includes('média gols sofridos') || (label.includes('média') && label.includes('sofridos'))) {
+      const numValue = parseNumericValue(value);
       if (numValue > 0) {
         defaultStats.avgGoalsConceded = numValue;
+        console.log(`[extractGoalStatsFromTable] ✓ Média gols sofridos (${scope}): ${numValue} (de "${value}")`);
       }
-    } else if (label.includes('média de gols marcados+sofridos') || label.includes('média total')) {
-      const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+    } else if (label.includes('média de gols marcados+sofridos') || label.includes('média total') || (label.includes('média') && label.includes('total'))) {
+      const numValue = parseNumericValue(value);
       if (numValue > 0) {
         defaultStats.avgTotalGoals = numValue;
+        console.log(`[extractGoalStatsFromTable] ✓ Média total gols (${scope}): ${numValue}`);
       }
-    } else if (label.includes('mais de 2,5') || label.includes('> 2,5') || label.includes('mais de 2.5')) {
-      const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
+    } else if (label.includes('mais de 2,5') || label.includes('> 2,5') || label.includes('mais de 2.5') || label.includes('>2.5')) {
+      const numValue = parseIntegerValue(value);
       if (numValue > 0) {
         defaultStats.over25Pct = numValue;
+        console.log(`[extractGoalStatsFromTable] ✓ > 2.5 gols (${scope}): ${numValue}%`);
       }
-    } else if (label.includes('menos de 2,5') || label.includes('< 2,5') || label.includes('menos de 2.5')) {
-      const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
+    } else if (label.includes('menos de 2,5') || label.includes('< 2,5') || label.includes('menos de 2.5') || label.includes('<2.5')) {
+      const numValue = parseIntegerValue(value);
       if (numValue > 0) {
         defaultStats.under25Pct = numValue;
+        console.log(`[extractGoalStatsFromTable] ✓ < 2.5 gols (${scope}): ${numValue}%`);
       }
-    } else if (label.includes('sem marcar') || label.includes('s/ marcar') || label.includes('sem marcar gols')) {
-      const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
+    } else if (label.includes('sem marcar') || label.includes('s/ marcar') || label.includes('sem marcar gols') || (label.includes('sem') && label.includes('marcar'))) {
+      const numValue = parseIntegerValue(value);
       if (numValue > 0) {
         defaultStats.noGoalsScoredPct = numValue;
+        console.log(`[extractGoalStatsFromTable] ✓ Jogos sem marcar (${scope}): ${numValue}%`);
       }
-    } else if (label.includes('sem sofrer') || label.includes('s/ sofrer') || label.includes('sem sofrer gols')) {
-      const numValue = parseInt(value.replace(/[^0-9]/g, '')) || 0;
+    } else if (label.includes('sem sofrer') || label.includes('s/ sofrer') || label.includes('sem sofrer gols') || (label.includes('sem') && label.includes('sofrer'))) {
+      const numValue = parseIntegerValue(value);
       if (numValue > 0) {
         defaultStats.noGoalsConcededPct = numValue;
+        console.log(`[extractGoalStatsFromTable] ✓ Jogos sem sofrer (${scope}): ${numValue}%`);
       }
     }
   }
@@ -1186,7 +1227,10 @@ function extractGoalStatsFromTable(tableHtml: string, scope: 'home' | 'away' | '
   // Calcula média total se não foi encontrada diretamente
   if (defaultStats.avgTotalGoals === 0 && defaultStats.avgGoalsScored > 0 && defaultStats.avgGoalsConceded > 0) {
     defaultStats.avgTotalGoals = defaultStats.avgGoalsScored + defaultStats.avgGoalsConceded;
+    console.log(`[extractGoalStatsFromTable] Calculada média total: ${defaultStats.avgTotalGoals}`);
   }
+
+  console.log(`[extractGoalStatsFromTable] RESULTADO (${scope}): Marcados=${defaultStats.avgGoalsScored}, Sofridos=${defaultStats.avgGoalsConceded}, Total=${defaultStats.avgTotalGoals}`);
 
   return defaultStats;
 }
@@ -1759,15 +1803,148 @@ export default async function handler(
       console.log('=== Extraindo Estatísticas de Gols ===');
       console.log(`Extraindo goal stats para ${matchInfo.teamA} e ${matchInfo.teamB}`);
       
-      // IMPORTANTE: Extrai separadamente para garantir que cada time pega sua própria tabela
-      // A função extractGoalStats busca a tabela específica de cada time
-      const teamAGoalStatsHome = extractGoalStats(html, matchInfo.teamA, 'home');
-      const teamAGoalStatsAway = extractGoalStats(html, matchInfo.teamA, 'away');
-      const teamAGoalStatsGlobal = extractGoalStats(html, matchInfo.teamA, 'global');
+      // NOVA ABORDAGEM: Busca todas as tabelas uma vez e distribui entre os times
+      // Isso garante que cada time pegue sua própria tabela
+      const teamANormalized = normalizeTeamName(matchInfo.teamA);
+      const teamBNormalized = normalizeTeamName(matchInfo.teamB);
+      const teamAActualName = findTeamNameInHTML(html, matchInfo.teamA) || matchInfo.teamA;
+      const teamBActualName = findTeamNameInHTML(html, matchInfo.teamB) || matchInfo.teamB;
+      const teamAActualNormalized = normalizeTeamName(teamAActualName);
+      const teamBActualNormalized = normalizeTeamName(teamBActualName);
       
-      const teamBGoalStatsHome = extractGoalStats(html, matchInfo.teamB, 'home');
-      const teamBGoalStatsAway = extractGoalStats(html, matchInfo.teamB, 'away');
-      const teamBGoalStatsGlobal = extractGoalStats(html, matchInfo.teamB, 'global');
+      console.log(`[Goal Stats] Time A: "${matchInfo.teamA}" -> "${teamAActualName}" (normalizado: "${teamAActualNormalized}")`);
+      console.log(`[Goal Stats] Time B: "${matchInfo.teamB}" -> "${teamBActualName}" (normalizado: "${teamBActualNormalized}")`);
+      
+      // Busca todas as tabelas de goal stats
+      let sectionHtml = '';
+      const sectionPatterns = [
+        /(?:ÚLTIMOS 10 JOGOS|GOLS|Análise de Gols)[\s\S]*?(?:Confronto Direto|Classificação|Análise|$)/i,
+        /GOLS[\s\S]*?(?:Confronto Direto|Classificação|Análise|$)/i,
+        /Análise de Gols[\s\S]*?(?:Confronto Direto|Classificação|Análise|$)/i,
+      ];
+      
+      for (const pattern of sectionPatterns) {
+        const sectionMatch = html.match(pattern);
+        if (sectionMatch) {
+          sectionHtml = sectionMatch[0];
+          break;
+        }
+      }
+      
+      if (!sectionHtml) {
+        sectionHtml = html;
+      }
+      
+      // Busca todas as tabelas
+      const tablePatterns = [
+        /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*(?:stat-last10|stat-seqs)[^"]*"[^>]*>([\s\S]*?)<\/table>/gi,
+        /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/gi,
+      ];
+      
+      const allGoalStatsTables: Array<{ teamName: string; tableHtml: string; index: number }> = [];
+      let tableIndex = 0;
+      
+      for (const tableRegex of tablePatterns) {
+        let match;
+        while ((match = tableRegex.exec(sectionHtml)) !== null) {
+          const foundTeamName = match[1].trim();
+          const tableHtml = match[2];
+          
+          const isGoalStatsTable = 
+            tableHtml.includes('Média de gols') || 
+            tableHtml.includes('> 2,5') || 
+            tableHtml.includes('< 2,5') || 
+            tableHtml.includes('Jogos sem') ||
+            tableHtml.includes('Média de gols marcados') ||
+            tableHtml.includes('Média de gols sofridos') ||
+            (tableHtml.includes('média') && (tableHtml.includes('gols') || tableHtml.includes('gol')));
+          
+          if (isGoalStatsTable) {
+            const exists = allGoalStatsTables.some(t => t.teamName === foundTeamName && t.tableHtml === tableHtml);
+            if (!exists) {
+              allGoalStatsTables.push({ teamName: foundTeamName, tableHtml, index: tableIndex++ });
+            }
+          }
+        }
+      }
+      
+      console.log(`[Goal Stats] Total de ${allGoalStatsTables.length} tabelas encontradas`);
+      allGoalStatsTables.forEach((t, idx) => {
+        const foundNormalized = normalizeTeamName(t.teamName);
+        console.log(`[Goal Stats]   Tabela ${idx + 1}: "${t.teamName}" (normalizado: "${foundNormalized}")`);
+      });
+      
+      // Encontra tabela para Time A
+      let teamATable = allGoalStatsTables.find(t => {
+        const foundNormalized = normalizeTeamName(t.teamName);
+        return foundNormalized === teamAActualNormalized || foundNormalized === teamANormalized;
+      });
+      
+      // Se não encontrou exato, tenta flexível
+      if (!teamATable) {
+        for (const t of allGoalStatsTables) {
+          const foundNormalized = normalizeTeamName(t.teamName);
+          const foundCleaned = foundNormalized.replace(/[^a-z0-9]/g, '');
+          const searchCleaned = teamAActualNormalized.replace(/[^a-z0-9]/g, '');
+          if ((foundCleaned.includes(searchCleaned) || searchCleaned.includes(foundCleaned)) && foundCleaned.length >= 3 && searchCleaned.length >= 3) {
+            teamATable = t;
+            console.log(`[Goal Stats] Time A: Match flexível encontrado: "${t.teamName}"`);
+            break;
+          }
+        }
+      }
+      
+      // Se ainda não encontrou e há 2 tabelas, usa a primeira
+      if (!teamATable && allGoalStatsTables.length >= 1) {
+        teamATable = allGoalStatsTables[0];
+        console.log(`[Goal Stats] Time A: Usando primeira tabela como fallback: "${teamATable.teamName}"`);
+      }
+      
+      // Encontra tabela para Time B (garantindo que seja diferente da do Time A)
+      let teamBTable = allGoalStatsTables.find(t => {
+        if (teamATable && t === teamATable) return false; // Não pode ser a mesma tabela
+        const foundNormalized = normalizeTeamName(t.teamName);
+        return foundNormalized === teamBActualNormalized || foundNormalized === teamBNormalized;
+      });
+      
+      // Se não encontrou exato, tenta flexível
+      if (!teamBTable) {
+        for (const t of allGoalStatsTables) {
+          if (teamATable && t === teamATable) continue; // Pula a tabela do Time A
+          const foundNormalized = normalizeTeamName(t.teamName);
+          const foundCleaned = foundNormalized.replace(/[^a-z0-9]/g, '');
+          const searchCleaned = teamBActualNormalized.replace(/[^a-z0-9]/g, '');
+          if ((foundCleaned.includes(searchCleaned) || searchCleaned.includes(foundCleaned)) && foundCleaned.length >= 3 && searchCleaned.length >= 3) {
+            teamBTable = t;
+            console.log(`[Goal Stats] Time B: Match flexível encontrado: "${t.teamName}"`);
+            break;
+          }
+        }
+      }
+      
+      // Se ainda não encontrou e há 2 tabelas, usa a segunda
+      if (!teamBTable && allGoalStatsTables.length >= 2) {
+        teamBTable = allGoalStatsTables[1];
+        console.log(`[Goal Stats] Time B: Usando segunda tabela como fallback: "${teamBTable.teamName}"`);
+      }
+      
+      // Se ainda não encontrou, usa a primeira disponível que não seja do Time A
+      if (!teamBTable && allGoalStatsTables.length >= 1) {
+        teamBTable = allGoalStatsTables.find(t => t !== teamATable) || allGoalStatsTables[0];
+        console.log(`[Goal Stats] Time B: Usando tabela disponível: "${teamBTable?.teamName}"`);
+      }
+      
+      console.log(`[Goal Stats] Tabela Time A: ${teamATable ? `"${teamATable.teamName}"` : 'NÃO ENCONTRADA'}`);
+      console.log(`[Goal Stats] Tabela Time B: ${teamBTable ? `"${teamBTable.teamName}"` : 'NÃO ENCONTRADA'}`);
+      
+      // Extrai stats de cada tabela
+      const teamAGoalStatsHome = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'home') : extractGoalStats(html, matchInfo.teamA, 'home');
+      const teamAGoalStatsAway = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'away') : extractGoalStats(html, matchInfo.teamA, 'away');
+      const teamAGoalStatsGlobal = teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'global') : extractGoalStats(html, matchInfo.teamA, 'global');
+      
+      const teamBGoalStatsHome = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'home') : extractGoalStats(html, matchInfo.teamB, 'home');
+      const teamBGoalStatsAway = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'away') : extractGoalStats(html, matchInfo.teamB, 'away');
+      const teamBGoalStatsGlobal = teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'global') : extractGoalStats(html, matchInfo.teamB, 'global');
       
       const teamAGoalStats = {
         home: teamAGoalStatsHome,
