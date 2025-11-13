@@ -141,7 +141,7 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
       )}
 
       <p className="text-gray-400 text-sm mt-3">
-        💡 <strong>Dica:</strong> Use "Buscar do Site" para fazer scraping automático, ou cole o HTML manualmente/faça upload do arquivo .txt
+        💡 <strong>Dica:</strong> Se "Buscar do Site" não funcionar (erro 403), o site pode estar bloqueando requisições automáticas. Use "Colar HTML" ou "Upload de Arquivo" como alternativa.
       </p>
     </div>
   );

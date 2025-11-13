@@ -241,7 +241,7 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
       )}
 
       <p className="text-gray-400 text-sm mt-3">
-        💡 <strong>Dica:</strong> Cole a URL da página, o HTML da página de detalhes da partida ou faça upload do arquivo .txt
+        💡 <strong>Dica:</strong> Se a URL não funcionar (erro 403), o site pode estar bloqueando requisições automáticas. Cole o HTML manualmente ou faça upload do arquivo .txt como alternativa.
       </p>
     </div>
   );

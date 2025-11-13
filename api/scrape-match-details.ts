@@ -29,6 +29,9 @@ async function fetchSiteHTML(url: string): Promise<string> {
     });
 
     if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error(`Acesso negado (403): O site está bloqueando requisições automáticas. Cole o HTML manualmente ou use a URL diretamente.`);
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
