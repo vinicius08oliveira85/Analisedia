@@ -1244,21 +1244,34 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
     }
   }
   
-  // Encontra a tabela do time específico
-  const foundTable = goalStatsTables.find(t => {
+  // Encontra a tabela do time específico - busca exata primeiro, depois flexível
+  let foundTable = goalStatsTables.find(t => {
     const foundNormalized = normalizeTeamName(t.teamName);
-    return foundNormalized === normalizedTeam || 
-           foundNormalized.includes(normalizedTeam) || 
-           normalizedTeam.includes(foundNormalized);
+    return foundNormalized === normalizedTeam;
   });
+  
+  // Se não encontrou exato, tenta busca flexível
+  if (!foundTable) {
+    foundTable = goalStatsTables.find(t => {
+      const foundNormalized = normalizeTeamName(t.teamName);
+      return foundNormalized.includes(normalizedTeam) || 
+             normalizedTeam.includes(foundNormalized);
+    });
+  }
   
   let tableHtml = '';
   
   if (foundTable) {
     tableHtml = foundTable.tableHtml;
-    console.log(`[extractGoalStats] Tabela encontrada para ${teamName} (encontrado: ${foundTable.teamName})`);
+    console.log(`[extractGoalStats] ✓✓✓ Tabela encontrada para ${teamName} (encontrado: "${foundTable.teamName}")`);
+    console.log(`[extractGoalStats] Primeiros 200 chars da tabela: ${tableHtml.substring(0, 200)}`);
   } else {
-    console.log(`[extractGoalStats] Nenhuma tabela encontrada para ${teamName}. Tabelas disponíveis: ${goalStatsTables.map(t => t.teamName).join(', ')}`);
+    console.log(`[extractGoalStats] ⚠ Nenhuma tabela encontrada para ${teamName}. Tabelas disponíveis: ${goalStatsTables.map(t => `"${t.teamName}"`).join(', ')}`);
+    console.log(`[extractGoalStats] Nome normalizado buscado: "${normalizedTeam}"`);
+    goalStatsTables.forEach(t => {
+      const foundNormalized = normalizeTeamName(t.teamName);
+      console.log(`[extractGoalStats]   - "${t.teamName}" (normalizado: "${foundNormalized}")`);
+    });
   }
   
   if (tableHtml) {
@@ -1629,18 +1642,36 @@ export default async function handler(
       console.log('=== Extraindo Estatísticas de Gols ===');
       console.log(`Extraindo goal stats para ${matchInfo.teamA} e ${matchInfo.teamB}`);
       
-      // Usa a função extractGoalStats que já busca tanto stat-last10 quanto stat-seqs
+      // IMPORTANTE: Extrai separadamente para garantir que cada time pega sua própria tabela
+      // A função extractGoalStats busca a tabela específica de cada time
+      const teamAGoalStatsHome = extractGoalStats(html, matchInfo.teamA, 'home');
+      const teamAGoalStatsAway = extractGoalStats(html, matchInfo.teamA, 'away');
+      const teamAGoalStatsGlobal = extractGoalStats(html, matchInfo.teamA, 'global');
+      
+      const teamBGoalStatsHome = extractGoalStats(html, matchInfo.teamB, 'home');
+      const teamBGoalStatsAway = extractGoalStats(html, matchInfo.teamB, 'away');
+      const teamBGoalStatsGlobal = extractGoalStats(html, matchInfo.teamB, 'global');
+      
       const teamAGoalStats = {
-        home: extractGoalStats(html, matchInfo.teamA, 'home'),
-        away: extractGoalStats(html, matchInfo.teamA, 'away'),
-        global: extractGoalStats(html, matchInfo.teamA, 'global')
+        home: teamAGoalStatsHome,
+        away: teamAGoalStatsAway,
+        global: teamAGoalStatsGlobal
       };
       
       const teamBGoalStats = {
-        home: extractGoalStats(html, matchInfo.teamB, 'home'),
-        away: extractGoalStats(html, matchInfo.teamB, 'away'),
-        global: extractGoalStats(html, matchInfo.teamB, 'global')
+        home: teamBGoalStatsHome,
+        away: teamBGoalStatsAway,
+        global: teamBGoalStatsGlobal
       };
+      
+      // Validação: verifica se os dados são diferentes (não devem ser iguais)
+      const teamAHomeScored = teamAGoalStats.home.avgGoalsScored;
+      const teamBHomeScored = teamBGoalStats.home.avgGoalsScored;
+      
+      if (teamAHomeScored > 0 && teamBHomeScored > 0 && teamAHomeScored === teamBHomeScored) {
+        console.warn(`[Goal Stats] ⚠⚠⚠ ATENÇÃO: Dados iguais detectados! Time A (${matchInfo.teamA}) e Time B (${matchInfo.teamB}) têm os mesmos valores.`);
+        console.warn(`[Goal Stats] Time A Home: ${teamAHomeScored}, Time B Home: ${teamBHomeScored}`);
+      }
       
       console.log(`[Goal Stats] Time A (${matchInfo.teamA}):`, {
         home: `Marcados=${teamAGoalStats.home.avgGoalsScored}, Sofridos=${teamAGoalStats.home.avgGoalsConceded}`,
