@@ -427,7 +427,8 @@ function convertToMatchDetails(event: SportsEvent): MatchDetails {
     matchInfo: {
       date: dateStr,
       time: timeStr,
-      competition: competition
+      competition: competition,
+      url: event.url || undefined
     },
     ...placeholderData
   };

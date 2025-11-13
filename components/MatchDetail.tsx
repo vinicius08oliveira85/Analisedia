@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MatchHeader } from './MatchHeader';
 import { Tabs } from './Tabs';
 import { OverviewTab } from './OverviewTab';
@@ -9,6 +9,7 @@ import { GeminiAnalysis } from './GeminiAnalysis';
 import { ProbabilityAnalysisTab } from './ProbabilityAnalysisTab';
 import { UpdateMatchDetails } from './UpdateMatchDetails';
 import { UpdateLiveStatus } from './UpdateLiveStatus';
+import { scrapeMatchDetailsFromURL, applyMatchDetailsUpdate } from '../services/matchDetailsService';
 import type { MatchDetails, Tab, LiveMatchStatus, MatchOdds } from '../types';
 
 interface MatchDetailProps {
@@ -21,6 +22,8 @@ interface MatchDetailProps {
 export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavorite, onToggleFavorite }) => {
   const [currentMatch, setCurrentMatch] = useState<MatchDetails>(match);
   const [activeTab, setActiveTab] = useState<Tab>('Visão Geral');
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
 
   const handleDetailsUpdated = (updatedMatch: MatchDetails) => {
     setCurrentMatch(updatedMatch);
@@ -33,6 +36,45 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
       odds: odds || prev.odds
     }));
   };
+
+  // Scraping automático dos detalhes quando a página carrega (se tiver URL)
+  useEffect(() => {
+    const loadDetailsAutomatically = async () => {
+      // Verifica se já tem dados completos (não são placeholders)
+      const hasCompleteData = 
+        currentMatch.h2hData.length > 0 || 
+        currentMatch.teamAForm.length > 0 || 
+        currentMatch.teamBForm.length > 0;
+
+      // Se já tem dados completos ou não tem URL, não faz scraping
+      if (hasCompleteData || !currentMatch.matchInfo.url) {
+        return;
+      }
+
+      setIsLoadingDetails(true);
+      setDetailsError(null);
+
+      try {
+        const result = await scrapeMatchDetailsFromURL(
+          currentMatch.matchInfo.url,
+          currentMatch.id
+        );
+
+        if (result.success && result.data) {
+          const updatedMatch = applyMatchDetailsUpdate(currentMatch, result.data);
+          setCurrentMatch(updatedMatch);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar detalhes';
+        setDetailsError(errorMessage);
+        console.error('Erro ao carregar detalhes automaticamente:', error);
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    };
+
+    loadDetailsAutomatically();
+  }, [match.id]); // Executa apenas uma vez quando o match muda
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -91,6 +133,24 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
             </svg>
             Voltar para a lista de jogos
         </button>
+        {isLoadingDetails && (
+          <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
+              <p className="text-blue-200 text-sm">Carregando detalhes da partida automaticamente...</p>
+            </div>
+          </div>
+        )}
+        {detailsError && (
+          <div className="bg-yellow-900/50 border border-yellow-700 rounded-lg p-4 mb-4">
+            <p className="text-yellow-200 text-sm">
+              ⚠️ Não foi possível carregar detalhes automaticamente: {detailsError}
+            </p>
+            <p className="text-yellow-300 text-xs mt-1">
+              Use o botão abaixo para atualizar manualmente.
+            </p>
+          </div>
+        )}
         <UpdateMatchDetails match={currentMatch} onDetailsUpdated={handleDetailsUpdated} />
         <UpdateLiveStatus match={currentMatch} onStatusUpdated={handleLiveStatusUpdated} />
         <MatchHeader 

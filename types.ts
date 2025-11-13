@@ -51,6 +51,7 @@ export interface MatchInfo {
     date: string;
     time: string;
     competition: string;
+    url?: string; // URL da página de detalhes do jogo
 }
 
 export interface MatchOdds {

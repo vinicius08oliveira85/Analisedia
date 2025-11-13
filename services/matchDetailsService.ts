@@ -75,6 +75,34 @@ export async function uploadMatchDetailsFile(
 }
 
 /**
+ * Faz scraping automático dos detalhes da partida usando a URL
+ */
+export async function scrapeMatchDetailsFromURL(
+  url: string,
+  matchId: string
+): Promise<MatchDetailsResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/scrape-match-details?url=${encodeURIComponent(url)}&matchId=${encodeURIComponent(matchId)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+      throw new Error(errorData.error || `Erro HTTP: ${response.status}`);
+    }
+
+    const data: MatchDetailsResponse = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Erro ao fazer scraping dos detalhes:', error);
+    throw error;
+  }
+}
+
+/**
  * Aplica os dados atualizados a um MatchDetails existente
  */
 export function applyMatchDetailsUpdate(
