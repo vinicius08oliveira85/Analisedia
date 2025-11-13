@@ -96,6 +96,9 @@ async function setupApiRoutes() {
     console.log('  - Importando openligadb...');
     const openLigaDBHandler = (await import('./api/openligadb.ts')).default;
 
+    console.log('  - Importando scrape-soccerway...');
+    const scrapeSoccerwayHandler = (await import('./api/scrape-soccerway.ts')).default;
+
     console.log('✅ Todos os handlers importados com sucesso');
 
     // Registra as rotas da API com wrapper
@@ -114,6 +117,8 @@ async function setupApiRoutes() {
     app.post('/api/scrape-sokkerpro', vercelWrapper(scrapeSokkerProHandler));
     app.get('/api/openligadb', vercelWrapper(openLigaDBHandler));
     app.post('/api/openligadb', vercelWrapper(openLigaDBHandler));
+    app.get('/api/scrape-soccerway', vercelWrapper(scrapeSoccerwayHandler));
+    app.post('/api/scrape-soccerway', vercelWrapper(scrapeSoccerwayHandler));
 
     console.log('✅ Rotas registradas');
   } catch (error) {

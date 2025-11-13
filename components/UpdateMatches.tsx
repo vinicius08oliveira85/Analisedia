@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { updateMatchesFromHTML, uploadMatchesFile, type UpdateMatchesResponse } from '../services/matchesService';
-import { scrapeMatchesFromSite, scrapeMatchesFromSokkerPro, getMatchesFromOpenLigaDB } from '../services/scrapeService';
+import { scrapeMatchesFromSite, scrapeMatchesFromSokkerPro, scrapeMatchesFromSoccerway, getMatchesFromOpenLigaDB } from '../services/scrapeService';
 import type { MatchDetails } from '../types';
 
 interface UpdateMatchesProps {
@@ -48,8 +48,28 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
       setIsUpdating(true);
       setMessage(null);
 
-      // Tenta primeiro com o endpoint do sokkerpro (se o HTML parece ser do sokkerpro)
+      // Tenta primeiro com o endpoint específico baseado no site
       const isSokkerPro = html.includes('sokkerpro') || html.includes('SokkerPRO') || html.includes('Sokker PRO');
+      const isSoccerway = html.includes('soccerway') || html.includes('Soccerway') || html.includes('soccer-way');
+      
+      if (isSoccerway) {
+        try {
+          const result = await scrapeMatchesFromSoccerway(undefined, html);
+          const leaguesCount = Array.isArray(result.leagues) ? result.leagues.length : (result.leagueGroups?.length || 0);
+          setMessage({
+            type: 'success',
+            text: `${result.message}. ${leaguesCount} liga(s) encontrada(s).`
+          });
+          onMatchesUpdated(result.matches);
+          if (onLeaguesUpdated && result.leagueGroups && result.leagueGroups.length > 0) {
+            onLeaguesUpdated(result.leagueGroups);
+          }
+          return;
+        } catch (soccerwayError: any) {
+          // Se falhar, tenta com método padrão
+          console.warn('Erro ao processar Soccerway, tentando método padrão:', soccerwayError);
+        }
+      }
       
       if (isSokkerPro) {
         try {
@@ -163,6 +183,41 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
     }
   };
 
+  const handleScrapeSoccerway = async () => {
+    setIsUpdating(true);
+    setMessage(null);
+
+    try {
+      const result = await scrapeMatchesFromSoccerway();
+      const leaguesCount = Array.isArray(result.leagues) ? result.leagues.length : (result.leagueGroups?.length || 0);
+      setMessage({
+        type: 'success',
+        text: `${result.message}. ${leaguesCount} liga(s) encontrada(s).`
+      });
+      onMatchesUpdated(result.matches);
+      if (onLeaguesUpdated && result.leagueGroups && result.leagueGroups.length > 0) {
+        onLeaguesUpdated(result.leagueGroups);
+      }
+    } catch (error) {
+      console.error('Erro ao fazer scraping do soccerway:', error);
+      let errorMessage = 'Erro ao fazer scraping do soccerway.com';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+
+      if (error && typeof error === 'object' && 'details' in error) {
+        errorMessage = `${errorMessage}: ${error.details}`;
+      }
+
+      setMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleScrapeSokkerPro = async () => {
     setIsUpdating(true);
     setMessage(null);
@@ -218,6 +273,14 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
             title="Busca jogos da Bundesliga (100% gratuito, sem limites)"
           >
             {isUpdating ? 'Processando...' : '🇩🇪 Bundesliga (Gratuito)'}
+          </button>
+          <button
+            onClick={handleScrapeSoccerway}
+            disabled={isUpdating}
+            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            title="Faz scraping direto do site soccerway.com (cobertura mundial)"
+          >
+            {isUpdating ? 'Processando...' : '🌍 Buscar do Soccerway'}
           </button>
           <button
             onClick={handleScrapeSokkerPro}
