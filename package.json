@@ -10,7 +10,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server.js"
+    "build:api": "tsc api/*.ts --outDir api --module esnext --target es2022 --moduleResolution node --esModuleInterop --skipLibCheck",
+    "start": "node --loader tsx/esm server.js"
   },
   "dependencies": {
     "react": "^19.2.0",

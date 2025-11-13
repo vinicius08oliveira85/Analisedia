@@ -68,12 +68,12 @@ function vercelWrapper(handler) {
 
 // Importa e registra as rotas da API
 async function setupApiRoutes() {
-  // Importa dinamicamente os handlers das APIs
-  const matchDetailsHandler = (await import('./api/match-details.js')).default;
-  const scrapeMatchesHandler = (await import('./api/scrape-matches.js')).default;
-  const scrapeMatchDetailsHandler = (await import('./api/scrape-match-details.js')).default;
-  const matchesHandler = (await import('./api/matches.js')).default;
-  const liveStatusHandler = (await import('./api/live-status.js')).default;
+  // Importa dinamicamente os handlers das APIs (TypeScript com tsx)
+  const matchDetailsHandler = (await import('./api/match-details.ts')).default;
+  const scrapeMatchesHandler = (await import('./api/scrape-matches.ts')).default;
+  const scrapeMatchDetailsHandler = (await import('./api/scrape-match-details.ts')).default;
+  const matchesHandler = (await import('./api/matches.ts')).default;
+  const liveStatusHandler = (await import('./api/live-status.ts')).default;
 
   // Registra as rotas da API com wrapper
   app.post('/api/match-details', vercelWrapper(matchDetailsHandler));
