@@ -86,7 +86,10 @@ async function setupApiRoutes() {
     
     console.log('  - Importando live-status...');
     const liveStatusHandler = (await import('./api/live-status.ts')).default;
-    
+
+    console.log('  - Importando process-competition...');
+    const processCompetitionHandler = (await import('./api/process-competition.ts')).default;
+
     console.log('✅ Todos os handlers importados com sucesso');
 
     // Registra as rotas da API com wrapper
@@ -100,7 +103,8 @@ async function setupApiRoutes() {
     app.post('/api/matches', vercelWrapper(matchesHandler));
     app.get('/api/live-status', vercelWrapper(liveStatusHandler));
     app.post('/api/live-status', vercelWrapper(liveStatusHandler));
-    
+    app.post('/api/process-competition', vercelWrapper(processCompetitionHandler));
+
     console.log('✅ Rotas registradas');
   } catch (error) {
     console.error('❌ Erro ao configurar rotas da API:', error);

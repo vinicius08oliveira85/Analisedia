@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { loadLeagues, addLeague, updateLeague, deleteLeague, findLeagueByName, type League } from '../services/leagueService';
+import { processCompetitionHTML, scrapeCompetitionFromURL, type CompetitionData } from '../services/competitionService';
 import { Card } from './Card';
 import type { MatchDetails } from '../types';
 
@@ -12,6 +13,10 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
   const [leagues, setLeagues] = useState<League[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processMessage, setProcessMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [competitionData, setCompetitionData] = useState<CompetitionData | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<Partial<League>>({
     name: '',
     competitionUrl: '',
@@ -105,6 +110,128 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
     setIsAdding(false);
     setEditingId(null);
     setFormData({ name: '', competitionUrl: '', statsUrl: '', country: '', season: '' });
+    setCompetitionData(null);
+    setProcessMessage(null);
+  };
+
+  const handlePasteHTML = async () => {
+    try {
+      const html = await navigator.clipboard.readText();
+      if (!html || html.trim().length === 0) {
+        setProcessMessage({ type: 'error', text: 'Nenhum texto encontrado na área de transferência' });
+        return;
+      }
+
+      setIsProcessing(true);
+      setProcessMessage(null);
+
+      const result = await processCompetitionHTML(html);
+      
+      if (result.success && result.data) {
+        setCompetitionData(result.data);
+        // Preenche o formulário com os dados extraídos
+        setFormData({
+          name: result.data.name,
+          competitionUrl: result.data.url || formData.competitionUrl || '',
+          statsUrl: formData.statsUrl || '',
+          country: formData.country || '',
+          season: formData.season || '',
+        });
+        setProcessMessage({ 
+          type: 'success', 
+          text: `${result.message}. ${result.data.standings.length} times encontrados na classificação.` 
+        });
+      } else {
+        setProcessMessage({ type: 'error', text: 'Não foi possível extrair dados do HTML' });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao processar HTML';
+      setProcessMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    setProcessMessage(null);
+
+    try {
+      const text = await file.text();
+      const result = await processCompetitionHTML(text);
+      
+      if (result.success && result.data) {
+        setCompetitionData(result.data);
+        setFormData({
+          name: result.data.name,
+          competitionUrl: result.data.url || formData.competitionUrl || '',
+          statsUrl: formData.statsUrl || '',
+          country: formData.country || '',
+          season: formData.season || '',
+        });
+        setProcessMessage({ 
+          type: 'success', 
+          text: `${result.message}. ${result.data.standings.length} times encontrados na classificação.` 
+        });
+      } else {
+        setProcessMessage({ type: 'error', text: 'Não foi possível extrair dados do arquivo' });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao processar arquivo';
+      setProcessMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsProcessing(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleScrapeFromURL = async () => {
+    const urlToUse = formData.competitionUrl?.trim();
+    if (!urlToUse) {
+      setProcessMessage({ type: 'error', text: 'Por favor, informe a URL da competição' });
+      return;
+    }
+
+    try {
+      new URL(urlToUse);
+    } catch {
+      setProcessMessage({ type: 'error', text: 'URL inválida' });
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessMessage(null);
+
+    try {
+      const result = await scrapeCompetitionFromURL(urlToUse);
+      
+      if (result.success && result.data) {
+        setCompetitionData(result.data);
+        setFormData({
+          name: result.data.name,
+          competitionUrl: urlToUse,
+          statsUrl: formData.statsUrl || '',
+          country: formData.country || '',
+          season: formData.season || '',
+        });
+        setProcessMessage({ 
+          type: 'success', 
+          text: `${result.message}. ${result.data.standings.length} times encontrados na classificação.` 
+        });
+      } else {
+        setProcessMessage({ type: 'error', text: 'Não foi possível extrair dados da URL' });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao fazer scraping da URL';
+      setProcessMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Sugestão baseada na competição do jogo atual
@@ -112,6 +239,94 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
 
   return (
     <div className="space-y-6">
+      {/* Seção de importar dados da competição */}
+      <Card title="Importar Dados da Competição" className="border border-purple-500/30">
+        <div className="space-y-4">
+          <p className="text-gray-300 text-sm">
+            Cole o HTML da página de competição ou faça upload de um arquivo para extrair automaticamente os dados da liga.
+          </p>
+          
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={handlePasteHTML}
+              disabled={isProcessing}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            >
+              {isProcessing ? 'Processando...' : 'Colar HTML da Área de Transferência'}
+            </button>
+            <label className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors cursor-pointer">
+              {isProcessing ? 'Processando...' : 'Upload de Arquivo HTML'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.html"
+                onChange={handleFileUpload}
+                disabled={isProcessing}
+                className="hidden"
+              />
+            </label>
+            <button
+              onClick={handleScrapeFromURL}
+              disabled={isProcessing || !formData.competitionUrl?.trim()}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            >
+              {isProcessing ? 'Processando...' : 'Buscar da URL'}
+            </button>
+          </div>
+
+          {processMessage && (
+            <div
+              className={`p-3 rounded-md ${
+                processMessage.type === 'success'
+                  ? 'bg-green-900/50 border border-green-700 text-green-200'
+                  : 'bg-red-900/50 border border-red-700 text-red-200'
+              }`}
+            >
+              <p className="text-sm">{processMessage.text}</p>
+            </div>
+          )}
+
+          {competitionData && (
+            <div className="mt-4 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+              <h4 className="text-white font-semibold mb-2">Dados Extraídos:</h4>
+              <p className="text-gray-300 text-sm mb-2">
+                <strong>Nome:</strong> {competitionData.name}
+              </p>
+              <p className="text-gray-300 text-sm mb-2">
+                <strong>Classificação:</strong> {competitionData.standings.length} times
+              </p>
+              {competitionData.standings.length > 0 && (
+                <div className="mt-2 max-h-40 overflow-y-auto">
+                  <table className="w-full text-xs text-gray-300">
+                    <thead>
+                      <tr className="border-b border-gray-600">
+                        <th className="text-left p-1">Pos</th>
+                        <th className="text-left p-1">Time</th>
+                        <th className="text-center p-1">Pts</th>
+                        <th className="text-center p-1">J</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {competitionData.standings.slice(0, 10).map((standing) => (
+                        <tr key={standing.position} className="border-b border-gray-700">
+                          <td className="p-1">{standing.position}</td>
+                          <td className="p-1">{standing.team}</td>
+                          <td className="text-center p-1">{standing.points}</td>
+                          <td className="text-center p-1">{standing.played}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="text-gray-400 text-xs mt-2">
+                💡 Os dados foram preenchidos automaticamente no formulário abaixo. Revise e salve a liga.
+              </p>
+            </div>
+          )}
+        </div>
+      </Card>
+
       {/* Formulário de adicionar/editar */}
       {isAdding && (
         <Card title={editingId ? 'Editar Liga' : 'Adicionar Nova Liga'} className="border border-blue-500/30">
