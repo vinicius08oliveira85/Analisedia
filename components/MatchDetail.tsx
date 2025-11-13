@@ -7,6 +7,7 @@ import { StandingsTab } from './StandingsTab';
 import { GoalAnalysisTab } from './GoalAnalysisTab';
 import { GeminiAnalysis } from './GeminiAnalysis';
 import { ProbabilityAnalysisTab } from './ProbabilityAnalysisTab';
+import { LeaguesTab } from './LeaguesTab';
 import { UpdateMatchDetails } from './UpdateMatchDetails';
 import { UpdateLiveStatus } from './UpdateLiveStatus';
 import { scrapeMatchDetailsFromURL, applyMatchDetailsUpdate } from '../services/matchDetailsService';

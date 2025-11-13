@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type Tab = 'Visão Geral' | 'Análise com IA' | 'Probabilidades' | 'Confronto Direto' | 'Classificação' | 'Análise de Gols';
+export type Tab = 'Visão Geral' | 'Análise com IA' | 'Probabilidades' | 'Confronto Direto' | 'Classificação' | 'Análise de Gols' | 'Ligas';
 
 export interface ScopedStats<T> {
     home: T;
@@ -53,6 +53,17 @@ export interface MatchInfo {
     time: string;
     competition: string;
     url?: string; // URL da página de detalhes do jogo
+}
+
+export interface League {
+    id: string;
+    name: string;
+    competitionUrl?: string; // URL da página de competição/liga
+    country?: string;
+    season?: string;
+    notes?: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface MatchOdds {

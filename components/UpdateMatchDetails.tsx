@@ -154,7 +154,7 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
   return (
     <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Atualizar Detalhes da Partida</h2>
+        <h2 className="text-lg font-semibold text-white">Importar Detalhes da Partida</h2>
       </div>
 
       {/* Campo de URL */}
