@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { MatchDetails, Match, Standing, TeamStreaks, OpponentAnalysisMatch, ScopedStats } from '../types';
+import type { MatchDetails, Match, Standing, TeamStreaks, OpponentAnalysisMatch, ScopedStats, TeamGoalStats, GoalScoringPatterns, CorrectScore } from '../types';
 
 // Função auxiliar para criar streaks padrão
 function defaultStreaks(): TeamStreaks {
@@ -842,11 +842,53 @@ function extractOpponentAnalysis(html: string, teamName: string, context: 'home'
 function extractH2HMatches(html: string): Match[] {
   const matches: Match[] = [];
 
-  const h2hRegex = /<table[^>]*class="[^"]*stat-cd3[^"]*"[^>]*>([\s\S]*?)<\/table>/i;
-  const match = html.match(h2hRegex);
-  if (!match) return matches;
+  // Tenta múltiplos padrões de tabela H2H
+  const h2hPatterns = [
+    /<table[^>]*class="[^"]*stat-cd3[^"]*"[^>]*>([\s\S]*?)<\/table>/i,
+    /CONFRONTO DIRETO[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i,
+    /<table[^>]*class="[^"]*h2h[^"]*"[^>]*>([\s\S]*?)<\/table>/i,
+  ];
 
-  const tableHtml = match[1];
+  let tableHtml = '';
+  for (const pattern of h2hPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      tableHtml = match[1];
+      break;
+    }
+  }
+
+  if (!tableHtml) {
+    // Tenta buscar diretamente por linhas de tabela com datas e placares
+    const directH2HRegex = /<tr[^>]*>[\s\S]*?(\d{4}-\d{2}-\d{2})[\s\S]*?(\d+)[-:](\d+)[\s\S]*?<\/tr>/gi;
+    let directMatch;
+    while ((directMatch = directH2HRegex.exec(html)) !== null) {
+      // Tenta extrair mais contexto da linha
+      const rowHtml = directMatch[0];
+      const date = directMatch[1];
+      const homeScore = parseInt(directMatch[2]) || 0;
+      const awayScore = parseInt(directMatch[3]) || 0;
+      
+      // Tenta extrair nomes dos times da linha
+      const teamRegex = /(?:França|Ucrânia|France|Ukraine|[\w\s]+)/gi;
+      const teams = rowHtml.match(teamRegex) || [];
+      
+      if (teams.length >= 2 && date) {
+        matches.push({
+          date,
+          competition: '',
+          homeTeam: teams[0] || '',
+          awayTeam: teams[1] || '',
+          homeScore,
+          awayScore
+        });
+      }
+    }
+    
+    if (matches.length > 0) return matches;
+    return matches;
+  }
+
   const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
   const rows = tableHtml.match(rowRegex) || [];
 
@@ -855,30 +897,68 @@ function extractH2HMatches(html: string): Match[] {
     const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
     let cellMatch;
     while ((cellMatch = cellRegex.exec(row)) !== null) {
-      const cellContent = cellMatch[1]
-        .replace(/<[^>]+>/g, '')
+      let cellContent = cellMatch[1]
+        .replace(/<[^>]+>/g, ' ')
         .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
         .trim();
+      
+      // Extrai texto de links
+      const linkMatch = cellContent.match(/<a[^>]*>([^<]+)<\/a>/);
+      if (linkMatch) {
+        cellContent = linkMatch[1].trim();
+      }
+      
       cells.push(cellContent);
     }
 
-    if (cells.length >= 5) {
-      const date = cells[0] || '';
-      const competition = cells[1] || 'Brasileirão Série A';
-      const homeTeam = cells[2] || '';
-      const score = cells[3] || '0-0';
-      const awayTeam = cells[4] || '';
+    // Tenta diferentes formatos de células
+    if (cells.length >= 3) {
+      let date = '';
+      let competition = '';
+      let homeTeam = '';
+      let score = '0-0';
+      let awayTeam = '';
 
-      const [homeScore, awayScore] = score.split(':').map(s => parseInt(s.trim()) || 0);
+      // Formato 1: Data, Competição, Casa, Placar, Fora
+      if (cells.length >= 5) {
+        date = cells[0] || '';
+        competition = cells[1] || '';
+        homeTeam = cells[2] || '';
+        score = cells[3] || '0-0';
+        awayTeam = cells[4] || '';
+      }
+      // Formato 2: Data, Casa, Placar, Fora
+      else if (cells.length >= 4) {
+        date = cells[0] || '';
+        homeTeam = cells[1] || '';
+        score = cells[2] || '0-0';
+        awayTeam = cells[3] || '';
+      }
+      // Formato 3: Casa, Placar, Fora (sem data)
+      else {
+        homeTeam = cells[0] || '';
+        score = cells[1] || '0-0';
+        awayTeam = cells[2] || '';
+      }
 
-      matches.push({
-        date,
-        competition,
-        homeTeam,
-        awayTeam,
-        homeScore,
-        awayScore
-      });
+      // Processa placar (pode ser "1-1" ou "1:1")
+      const scoreMatch = score.match(/(\d+)[-:](\d+)/);
+      if (!scoreMatch) continue;
+
+      const homeScore = parseInt(scoreMatch[1]) || 0;
+      const awayScore = parseInt(scoreMatch[2]) || 0;
+
+      if (homeTeam && awayTeam) {
+        matches.push({
+          date: date || '',
+          competition: competition || '',
+          homeTeam: homeTeam.trim(),
+          awayTeam: awayTeam.trim(),
+          homeScore,
+          awayScore
+        });
+      }
     }
   }
 
@@ -989,6 +1069,219 @@ function extractMatchInfo(html: string): { teamA: string; teamB: string; date: s
   }
 
   return null;
+}
+
+// Função para extrair tabela de classificação
+function extractStandings(html: string): Standing[] {
+  const standings: Standing[] = [];
+  
+  // Procura por tabelas de classificação
+  const standingsPatterns = [
+    /Fase de Grupos[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i,
+    /Classificação[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/i,
+    /<table[^>]*class="[^"]*standings[^"]*"[^>]*>([\s\S]*?)<\/table>/i,
+    /<table[^>]*class="[^"]*table[^"]*"[^>]*>[\s\S]*?#[\s\S]*?TIME[\s\S]*?([\s\S]*?)<\/table>/i,
+  ];
+
+  let tableHtml = '';
+  for (const pattern of standingsPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      tableHtml = match[1];
+      break;
+    }
+  }
+
+  if (!tableHtml) return standings;
+
+  const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rows = tableHtml.match(rowRegex) || [];
+
+  for (const row of rows.slice(1)) { // Pula o header
+    const cells: string[] = [];
+    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(row)) !== null) {
+      let cellContent = cellMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      const linkMatch = cellContent.match(/<a[^>]*>([^<]+)<\/a>/);
+      if (linkMatch) {
+        cellContent = linkMatch[1].trim();
+      }
+      
+      cells.push(cellContent);
+    }
+
+    // Formato esperado: #, TIME, P, J, V, E, D, GM, GS, AG
+    if (cells.length >= 6) {
+      const position = parseInt(cells[0].replace(/[^\d]/g, '')) || 0;
+      const team = cells[1] || '';
+      const points = parseInt(cells[2].replace(/[^\d]/g, '')) || 0;
+      const played = parseInt(cells[3].replace(/[^\d]/g, '')) || 0;
+      const wins = parseInt(cells[4].replace(/[^\d]/g, '')) || 0;
+      const draws = parseInt(cells[5].replace(/[^\d]/g, '')) || 0;
+      const losses = parseInt(cells[6]?.replace(/[^\d]/g, '') || '0') || 0;
+
+      if (position > 0 && team) {
+        standings.push({
+          position,
+          team: team.trim(),
+          points,
+          played,
+          wins,
+          draws,
+          losses
+        });
+      }
+    }
+  }
+
+  return standings;
+}
+
+// Função para extrair estatísticas de gols de um time
+function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away' | 'global'): TeamGoalStats {
+  const defaultStats: TeamGoalStats = {
+    avgGoalsScored: 0,
+    avgGoalsConceded: 0,
+    avgTotalGoals: 0,
+    noGoalsScoredPct: 0,
+    noGoalsConcededPct: 0,
+    over25Pct: 0,
+    under25Pct: 0,
+    goalMoments: { scored: [0, 0, 0, 0, 0, 0], conceded: [0, 0, 0, 0, 0, 0] }
+  };
+
+  // Procura por seção específica do time e escopo
+  const normalizedTeam = normalizeTeamName(teamName);
+  const scopeLabel = scope === 'home' ? 'Casa' : scope === 'away' ? 'Fora' : 'Global';
+  
+  // Busca a seção de estatísticas de gols do time
+  const teamSectionRegex = new RegExp(
+    `${teamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${scopeLabel}[\\s\\S]*?Média de gols marcados[\\s\\S]*?(\\d+\\.?\\d*)[\\s\\S]*?Média de gols sofridos[\\s\\S]*?(\\d+\\.?\\d*)`,
+    'i'
+  );
+
+  let avgScored = 0;
+  let avgConceded = 0;
+
+  const match = html.match(teamSectionRegex);
+  if (match) {
+    avgScored = parseFloat(match[1]) || 0;
+    avgConceded = parseFloat(match[2]) || 0;
+  } else {
+    // Tenta buscar na tabela de estatísticas gerais
+    const generalStatsRegex = /Média de gols marcados por jogo[\s\S]*?(\d+\.?\d*)[\s\S]*?Média de gols sofridos por jogo[\s\S]*?(\d+\.?\d*)/i;
+    const generalMatch = html.match(generalStatsRegex);
+    if (generalMatch) {
+      avgScored = parseFloat(generalMatch[1]) || 0;
+      avgConceded = parseFloat(generalMatch[2]) || 0;
+    }
+  }
+
+  // Procura por percentuais na seção do time
+  const sectionRegex = new RegExp(
+    `${teamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${scopeLabel}[\\s\\S]*?(?:> 2,5 Gols|Jogos com Mais de 2,5 Gols)[\\s\\S]*?(\\d+)%[\\s\\S]*?(?:< 2,5 Gols|Jogos com menos de 2,5 Gols)[\\s\\S]*?(\\d+)%[\\s\\S]*?(?:Jogos s\\/ Marcar|Jogos sem marcar gols)[\\s\\S]*?(\\d+)%`,
+    'i'
+  );
+
+  const sectionMatch = html.match(sectionRegex);
+  const over25Pct = sectionMatch ? parseInt(sectionMatch[1]) : 0;
+  const under25Pct = sectionMatch ? parseInt(sectionMatch[2]) : 0;
+  const noScoredPct = sectionMatch ? parseInt(sectionMatch[3]) : 0;
+
+  // Procura por "Jogos sem sofrer"
+  const noConcededRegex = new RegExp(
+    `${teamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${scopeLabel}[\\s\\S]*?Jogos sem sofrer[\\s\\S]*?(\\d+)%`,
+    'i'
+  );
+  const noConcededMatch = html.match(noConcededRegex);
+  const noConcededPct = noConcededMatch ? parseInt(noConcededMatch[1]) : 0;
+
+  // Procura por momento dos gols (gráficos de barras)
+  const goalMomentsScored: number[] = [0, 0, 0, 0, 0, 0];
+  const goalMomentsConceded: number[] = [0, 0, 0, 0, 0, 0];
+  
+  // Busca na seção específica do time
+  const momentsSectionRegex = new RegExp(
+    `${teamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${scopeLabel}[\\s\\S]*?Momento dos Gols[\\s\\S]*?Marcados[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?Sofridos[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)[\\s\\S]*?(\\d+)`,
+    'i'
+  );
+
+  const momentsMatch = html.match(momentsSectionRegex);
+  if (momentsMatch) {
+    for (let i = 0; i < 6; i++) {
+      goalMomentsScored[i] = parseInt(momentsMatch[i + 1]) || 0;
+      goalMomentsConceded[i] = parseInt(momentsMatch[i + 7]) || 0;
+    }
+  } else {
+    // Tenta extrair dos gráficos individuais (0-15', 16-30', etc)
+    for (let i = 0; i < 6; i++) {
+      const periods = ['0-15', '16-30', '31-45', '46-60', '61-75', '76-90'];
+      const scoredRegex = new RegExp(`${periods[i]}[\\s\\S]*?Marcados[\\s\\S]*?(\\d+)`, 'i');
+      const concededRegex = new RegExp(`${periods[i]}[\\s\\S]*?Sofridos[\\s\\S]*?(\\d+)`, 'i');
+      
+      const scoredMatch = html.match(scoredRegex);
+      const concededMatch = html.match(concededRegex);
+      
+      if (scoredMatch) goalMomentsScored[i] = parseInt(scoredMatch[1]) || 0;
+      if (concededMatch) goalMomentsConceded[i] = parseInt(concededMatch[1]) || 0;
+    }
+  }
+
+  return {
+    avgGoalsScored: avgScored,
+    avgGoalsConceded: avgConceded,
+    avgTotalGoals: avgScored + avgConceded,
+    noGoalsScoredPct: noScoredPct,
+    noGoalsConcededPct: noConcededPct,
+    over25Pct: over25Pct,
+    under25Pct: under25Pct,
+    goalMoments: {
+      scored: goalMomentsScored,
+      conceded: goalMomentsConceded
+    }
+  };
+}
+
+// Função para extrair padrões de gols (abre marcador, etc)
+function extractGoalPatterns(html: string, teamName: string, scope: 'home' | 'away' | 'global'): GoalScoringPatterns {
+  const defaultPatterns: GoalScoringPatterns = {
+    opensScore: { games: 0, total: 0, pct: 0 },
+    winsWhenOpening: { games: 0, total: 0, pct: 0 },
+    comebacks: { games: 0, total: 0, pct: 0 }
+  };
+
+  // Procura por padrões na seção de estatísticas
+  const opensScoreRegex = new RegExp(`Abre marcador[\\s\\S]*?(\\d+)\\s+em\\s+(\\d+)`, 'i');
+  const winsWhenOpeningRegex = new RegExp(`vence no final[\\s\\S]*?(\\d+)\\s+em\\s+(\\d+)`, 'i');
+  const comebacksRegex = new RegExp(`Reviravoltas[\\s\\S]*?(\\d+)\\s+em\\s+(\\d+)`, 'i');
+
+  const opensMatch = html.match(opensScoreRegex);
+  const winsMatch = html.match(winsWhenOpeningRegex);
+  const comebacksMatch = html.match(comebacksRegex);
+
+  return {
+    opensScore: opensMatch ? {
+      games: parseInt(opensMatch[1]) || 0,
+      total: parseInt(opensMatch[2]) || 0,
+      pct: opensMatch[2] ? Math.round((parseInt(opensMatch[1]) / parseInt(opensMatch[2])) * 100) : 0
+    } : defaultPatterns.opensScore,
+    winsWhenOpening: winsMatch ? {
+      games: parseInt(winsMatch[1]) || 0,
+      total: parseInt(winsMatch[2]) || 0,
+      pct: winsMatch[2] ? Math.round((parseInt(winsMatch[1]) / parseInt(winsMatch[2])) * 100) : 0
+    } : defaultPatterns.winsWhenOpening,
+    comebacks: comebacksMatch ? {
+      games: parseInt(comebacksMatch[1]) || 0,
+      total: parseInt(comebacksMatch[2]) || 0,
+      pct: comebacksMatch[2] ? Math.round((parseInt(comebacksMatch[1]) / parseInt(comebacksMatch[2])) * 100) : 0
+    } : defaultPatterns.comebacks
+  };
 }
 
 export default async function handler(
@@ -1104,6 +1397,36 @@ export default async function handler(
       const h2hData = extractH2HMatches(html);
       console.log(`H2H: ${h2hData.length} jogos extraídos`);
 
+      // 5. Extrai Classificação
+      const standingsData = extractStandings(html);
+      console.log(`Classificação: ${standingsData.length} times extraídos`);
+
+      // 6. Extrai Estatísticas de Gols
+      const teamAGoalStats = {
+        home: extractGoalStats(html, matchInfo.teamA, 'home'),
+        away: extractGoalStats(html, matchInfo.teamA, 'away'),
+        global: extractGoalStats(html, matchInfo.teamA, 'global')
+      };
+      const teamBGoalStats = {
+        home: extractGoalStats(html, matchInfo.teamB, 'home'),
+        away: extractGoalStats(html, matchInfo.teamB, 'away'),
+        global: extractGoalStats(html, matchInfo.teamB, 'global')
+      };
+      console.log(`Goal Stats extraídos para ${matchInfo.teamA} e ${matchInfo.teamB}`);
+
+      // 7. Extrai Padrões de Gols
+      const teamAGoalPatterns = {
+        home: extractGoalPatterns(html, matchInfo.teamA, 'home'),
+        away: extractGoalPatterns(html, matchInfo.teamA, 'away'),
+        global: extractGoalPatterns(html, matchInfo.teamA, 'global')
+      };
+      const teamBGoalPatterns = {
+        home: extractGoalPatterns(html, matchInfo.teamB, 'home'),
+        away: extractGoalPatterns(html, matchInfo.teamB, 'away'),
+        global: extractGoalPatterns(html, matchInfo.teamB, 'global')
+      };
+      console.log(`Goal Patterns extraídos`);
+
       // Retorna os dados extraídos
       return res.status(200).json({
         success: true,
@@ -1112,10 +1435,17 @@ export default async function handler(
           teamAForm,
           teamBForm,
           h2hData,
+          standingsData,
           teamAStreaks,
           teamBStreaks,
           teamAOpponentAnalysis,
-          teamBOpponentAnalysis
+          teamBOpponentAnalysis,
+          teamAGoalStats,
+          teamBGoalStats,
+          teamAGoalPatterns,
+          teamBGoalPatterns,
+          teamACorrectScores: { home: { ht: [], ft: [] }, away: { ht: [], ft: [] }, global: { ht: [], ft: [] } },
+          teamBCorrectScores: { home: { ht: [], ft: [] }, away: { ht: [], ft: [] }, global: { ht: [], ft: [] } }
         },
         message: 'Detalhes da partida processados com sucesso',
         debug: {
