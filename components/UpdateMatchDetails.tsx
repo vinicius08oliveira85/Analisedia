@@ -11,6 +11,7 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
   const [isUpdating, setIsUpdating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [url, setUrl] = useState('');
+  const [competitionUrl, setCompetitionUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,7 +109,11 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
       setIsUpdating(true);
       setMessage(null);
 
-      const result: MatchDetailsResponse = await scrapeMatchDetailsFromURL(urlToUse, match.id);
+      const result: MatchDetailsResponse = await scrapeMatchDetailsFromURL(
+        urlToUse, 
+        match.id,
+        competitionUrl.trim() || undefined
+      );
       console.log('Resposta da API (URL):', result);
       
       // Verifica se há dados extraídos
@@ -179,6 +184,24 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
             {isUpdating ? 'Processando...' : 'Buscar da URL'}
           </button>
         </div>
+      </div>
+
+      {/* Campo de URL de Competição (Opcional) */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          URL da página de competição/liga (opcional - para buscar estatísticas):
+        </label>
+        <input
+          type="text"
+          value={competitionUrl}
+          onChange={(e) => setCompetitionUrl(e.target.value)}
+          placeholder="https://www.academiadasapostasbrasil.com/stats/competition/..."
+          disabled={isUpdating}
+          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-600 disabled:cursor-not-allowed"
+        />
+        <p className="text-gray-400 text-xs mt-1">
+          Se os dados de gols não forem encontrados na página de detalhes, o sistema buscará automaticamente na página de competição.
+        </p>
       </div>
 
       {/* Botões alternativos */}

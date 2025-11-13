@@ -77,10 +77,14 @@ export async function uploadMatchDetailsFile(
 /**
  * Faz scraping automático dos detalhes da partida usando a URL
  * Usa a API scrape-match-details para obter o HTML e depois processa via match-details
+ * @param url - URL da página de detalhes do jogo
+ * @param matchId - ID do jogo
+ * @param competitionUrl - URL opcional da página de competição/liga para buscar estatísticas
  */
 export async function scrapeMatchDetailsFromURL(
   url: string,
-  matchId: string
+  matchId: string,
+  competitionUrl?: string
 ): Promise<MatchDetailsResponse> {
   try {
     // Usa a API scrape-match-details para fazer fetch do HTML (evita CORS)
@@ -106,7 +110,11 @@ export async function scrapeMatchDetailsFromURL(
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ html: scrapeData.html, matchId }),
+        body: JSON.stringify({ 
+          html: scrapeData.html, 
+          matchId,
+          competitionUrl: competitionUrl || undefined
+        }),
       });
 
       if (!processResponse.ok) {
