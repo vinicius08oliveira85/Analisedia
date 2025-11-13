@@ -26,6 +26,7 @@ export interface Standing {
   wins: number;
   draws: number;
   losses: number;
+  competition?: string;
 }
 
 export interface TeamGoalStats {
