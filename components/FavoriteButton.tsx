@@ -10,11 +10,11 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({ isFavorite, onCl
     <button
       onClick={onClick}
       aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
-      className="p-2 rounded-full hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors duration-200"
+      className="p-1 sm:p-1.5 rounded-full hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors duration-200"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        className="h-6 w-6 transform transition-transform duration-300 ease-in-out"
+        className="h-4 w-4 sm:h-5 sm:w-5 transform transition-transform duration-300 ease-in-out"
         viewBox="0 0 24 24"
         strokeWidth="1.5"
         stroke={isFavorite ? '#FBBF24' : '#9CA3AF'}

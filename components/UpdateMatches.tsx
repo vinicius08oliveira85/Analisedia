@@ -254,51 +254,51 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Atualizar Jogos do Dia</h2>
-        <div className="flex flex-wrap gap-2">
+    <div className="bg-gray-800 rounded-md p-2 sm:p-3 mb-3 sm:mb-4 border border-gray-700">
+      <div className="flex items-center justify-between mb-2 sm:mb-3">
+        <h2 className="text-sm sm:text-base font-semibold text-white">Atualizar Jogos</h2>
+        <div className="flex flex-wrap gap-1 sm:gap-1.5">
           <button
             onClick={handleScrapeSite}
             disabled={isUpdating}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
             title="Faz scraping direto do site academiadasapostasbrasil.com"
           >
-            {isUpdating ? 'Processando...' : '🔄 Buscar do Site'}
+            {isUpdating ? '...' : '🔄 Site'}
           </button>
           <button
             onClick={handleOpenLigaDB}
             disabled={isUpdating}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
             title="Busca jogos da Bundesliga (100% gratuito, sem limites)"
           >
-            {isUpdating ? 'Processando...' : '🇩🇪 Bundesliga (Gratuito)'}
+            {isUpdating ? '...' : '🇩🇪 BL'}
           </button>
           <button
             onClick={handleScrapeSoccerway}
             disabled={isUpdating}
-            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
             title="Faz scraping direto do site soccerway.com (cobertura mundial)"
           >
-            {isUpdating ? 'Processando...' : '🌍 Buscar do Soccerway'}
+            {isUpdating ? '...' : '🌍 SW'}
           </button>
           <button
             onClick={handleScrapeSokkerPro}
             disabled={isUpdating}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
             title="Faz scraping direto do site sokkerpro.com"
           >
-            {isUpdating ? 'Processando...' : '⚽ Buscar do SokkerPro'}
+            {isUpdating ? '...' : '⚽ SP'}
           </button>
           <button
             onClick={handlePasteHTML}
             disabled={isUpdating}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
           >
-            {isUpdating ? 'Processando...' : 'Colar HTML'}
+            {isUpdating ? '...' : '📋 HTML'}
           </button>
-          <label className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors cursor-pointer">
-            {isUpdating ? 'Processando...' : 'Upload de Arquivo'}
+          <label className="px-2 py-1 sm:px-3 sm:py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors cursor-pointer">
+            {isUpdating ? '...' : '📁 File'}
             <input
               ref={fileInputRef}
               type="file"

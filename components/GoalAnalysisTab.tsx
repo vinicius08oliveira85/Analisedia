@@ -110,32 +110,32 @@ export const GoalAnalysisTab: React.FC<GoalAnalysisTabProps> = ({ teamAGoalStats
     }
 
     return (
-        <div className="space-y-8">
-            <div className="flex justify-center mb-4 rounded-lg p-1 bg-gray-900/50 border border-gray-700 w-full md:w-2/3 lg:w-1/2 mx-auto">
+        <div className="space-y-3 sm:space-y-4">
+            <div className="flex justify-center mb-2 sm:mb-3 rounded-lg p-0.5 sm:p-1 bg-gray-900/50 border border-gray-700 w-full md:w-2/3 lg:w-1/2 mx-auto">
                 <button onClick={() => setScope('Contextual')} className={getButtonClass('Contextual')}>
-                    Como Mandante / Visitante
+                    <span className="text-[10px] sm:text-xs">Mandante/Visitante</span>
                 </button>
                 <button onClick={() => setScope('Global')} className={getButtonClass('Global')}>
-                    Global (Competição)
+                    <span className="text-[10px] sm:text-xs">Global</span>
                 </button>
             </div>
             <div>
-                <h3 className="text-xl font-bold mb-6 text-green-400">Análise de Gols na Competição</h3>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <h3 className="text-sm sm:text-base font-bold mb-2 sm:mb-3 text-green-400">Análise de Gols</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
                     <GoalStatsDisplay stats={teamAStats} teamName={`${teamA.name} ${teamAContext}`} />
                     <GoalStatsDisplay stats={teamBStats} teamName={`${teamB.name} ${teamBContext}`} />
                 </div>
             </div>
             <div>
-                <h3 className="text-xl font-bold mb-6 text-green-400">Padrões de Gols</h3>
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <h3 className="text-sm sm:text-base font-bold mb-2 sm:mb-3 text-green-400">Padrões de Gols</h3>
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
                     <GoalScoringPatternsDisplay patterns={teamAPatterns} title={`${teamA.name} ${teamAContext}`}/>
                     <GoalScoringPatternsDisplay patterns={teamBPatterns} title={`${teamB.name} ${teamBContext}`}/>
                  </div>
             </div>
              <div>
-                <h3 className="text-xl font-bold mb-6 text-green-400">Resultados Frequentes</h3>
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <h3 className="text-sm sm:text-base font-bold mb-2 sm:mb-3 text-green-400">Resultados Frequentes</h3>
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
                     <CorrectScoreDisplay htScores={teamAScores.ht} ftScores={teamAScores.ft} title={`${teamA.name} ${teamAContext}`} />
                     <CorrectScoreDisplay htScores={teamBScores.ht} ftScores={teamBScores.ft} title={`${teamB.name} ${teamBContext}`} />
                  </div>

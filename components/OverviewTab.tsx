@@ -98,27 +98,27 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ teamA, teamB, teamAFor
   }
 
   return (
-    <div className="space-y-8">
-        <div className="flex justify-center mb-4 rounded-lg p-1 bg-gray-900/50 border border-gray-700 w-full md:w-2/3 lg:w-1/2 mx-auto">
+    <div className="space-y-3 sm:space-y-4">
+        <div className="flex justify-center mb-2 sm:mb-3 rounded-lg p-0.5 sm:p-1 bg-gray-900/50 border border-gray-700 w-full md:w-2/3 lg:w-1/2 mx-auto">
             <button onClick={() => setScope('Contextual')} className={getButtonClass('Contextual')}>
-                Como Mandante / Visitante
+                <span className="text-[10px] sm:text-xs">Mandante/Visitante</span>
             </button>
             <button onClick={() => setScope('Global')} className={getButtonClass('Global')}>
-                Global (Competição)
+                <span className="text-[10px] sm:text-xs">Global</span>
             </button>
         </div>
 
         <div>
-            <h3 className="text-xl font-bold mb-4 text-green-400">Percurso (Brasileirão Série A)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h3 className="text-sm sm:text-base font-bold mb-2 sm:mb-3 text-green-400">Percurso</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                 <StreaksDisplay streaks={teamAStreaksData} title={`${teamA.name} ${teamAContext}`} />
                 <StreaksDisplay streaks={teamBStreaksData} title={`${teamB.name} ${teamBContext}`} />
             </div>
         </div>
       
         <div>
-            <h3 className="text-xl font-bold mb-4 text-green-400">Análise Classificativa (Últimos 10)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h3 className="text-sm sm:text-base font-bold mb-2 sm:mb-3 text-green-400">Análise (Últimos 10)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                 <OpponentAnalysisDisplay analysis={teamAAnalysisData} title={`${teamA.name} ${teamAContext}`} teamName={teamA.name} />
                 <OpponentAnalysisDisplay analysis={teamBAnalysisData} title={`${teamB.name} ${teamBContext}`} teamName={teamB.name} />
             </div>

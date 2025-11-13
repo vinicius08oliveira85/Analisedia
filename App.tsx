@@ -134,9 +134,9 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
+    <div className="min-h-screen bg-gray-900 text-gray-200 font-sans text-xs sm:text-sm">
       <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-1.5 sm:px-3 lg:px-6 py-1.5 sm:py-3">
         {!selectedMatch && (
           <>
             <UpdateMatches 
@@ -144,10 +144,10 @@ const App: React.FC = () => {
               onLeaguesUpdated={handleLeaguesUpdated}
             />
             {leagues.length > 0 && (
-              <div className="mb-4 flex gap-2 justify-end">
+              <div className="mb-1.5 flex gap-1 justify-end">
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
                     viewMode === 'list'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -157,13 +157,13 @@ const App: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setViewMode('leagues')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
                     viewMode === 'leagues'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  Por Liga ({leagues.length})
+                  Ligas ({leagues.length})
                 </button>
               </div>
             )}
@@ -198,8 +198,8 @@ const App: React.FC = () => {
           />
         )}
       </main>
-      <footer className="text-center py-4 text-gray-500 text-sm">
-        <p>Desenvolvido com React e Tailwind CSS. Dados atualizados via API.</p>
+      <footer className="text-center py-1 text-gray-500 text-[10px] sm:text-xs">
+        <p>Futibou Analytics</p>
       </footer>
     </div>
   );
