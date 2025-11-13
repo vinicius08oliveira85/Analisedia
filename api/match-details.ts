@@ -883,7 +883,9 @@ function extractOpponentAnalysis(html: string, teamName: string, context: 'home'
   if (!match || !match[match.length - 1]) return analysis;
   
   // Extrai apenas jogos do contexto específico (Casa ou Fora)
-  return extractAnalysisFromTable(match[match.length - 1], actualTeamName, context);
+  // Se context for 'global', usa 'home' como padrão (ou pode ser undefined)
+  const analysisContext = context === 'global' ? undefined : context;
+  return extractAnalysisFromTable(match[match.length - 1], actualTeamName, analysisContext);
 }
 
 // Função para extrair confronto direto (stat-cd3)
