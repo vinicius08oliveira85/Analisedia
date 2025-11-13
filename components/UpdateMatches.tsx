@@ -48,6 +48,38 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
       setIsUpdating(true);
       setMessage(null);
 
+      // Tenta primeiro com o endpoint do sokkerpro (se o HTML parece ser do sokkerpro)
+      const isSokkerPro = html.includes('sokkerpro') || html.includes('SokkerPRO') || html.includes('Sokker PRO');
+      
+      if (isSokkerPro) {
+        try {
+          const result = await scrapeMatchesFromSokkerPro(undefined, html);
+          const leaguesCount = Array.isArray(result.leagues) ? result.leagues.length : (result.leagueGroups?.length || 0);
+          setMessage({
+            type: 'success',
+            text: `${result.message}. ${leaguesCount} liga(s) encontrada(s).`
+          });
+          onMatchesUpdated(result.matches);
+          if (onLeaguesUpdated && result.leagueGroups && result.leagueGroups.length > 0) {
+            onLeaguesUpdated(result.leagueGroups);
+          }
+          return;
+        } catch (sokkerError: any) {
+          // Se o erro indica que é SPA, mostra mensagem especial
+          if (sokkerError?.details?.isSPA || sokkerError?.message?.includes('SPA')) {
+            const errorMsg = sokkerError.details?.message || sokkerError.message || 'Site é uma SPA';
+            setMessage({ 
+              type: 'error', 
+              text: errorMsg.replace(/\n/g, ' ').substring(0, 500) + '... (veja instruções completas no console)' 
+            });
+            console.error('Erro SPA:', errorMsg);
+            return;
+          }
+          // Se não for erro de SPA, tenta com o método padrão
+        }
+      }
+
+      // Método padrão (academiadasapostasbrasil)
       const result: UpdateMatchesResponse = await updateMatchesFromHTML(html);
       setMessage({ type: 'success', text: result.message });
       onMatchesUpdated(result.matches);

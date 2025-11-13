@@ -56,9 +56,29 @@ function cleanHTMLText(value: string): string {
     .trim();
 }
 
+// Função para detectar se é uma SPA (Single Page Application)
+function isSPA(html: string): boolean {
+  // Verifica se o HTML tem apenas um div#app vazio (comum em SPAs)
+  const hasOnlyAppDiv = /<div[^>]*id=["']app["'][^>]*>\s*<\/div>/i.test(html);
+  const hasReactOrVue = html.includes('react') || html.includes('vue') || html.includes('__REACT') || html.includes('__VUE');
+  const hasModuleScripts = /<script[^>]*type=["'][^"]*module["'][^>]*>/i.test(html);
+  const bodyContent = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const bodyText = bodyContent ? bodyContent[1] : '';
+  const bodyTextLength = bodyText.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').trim().length;
+  
+  // Se o body tem muito pouco conteúdo (menos de 500 chars sem scripts/styles), provavelmente é SPA
+  return hasOnlyAppDiv || (hasModuleScripts && bodyTextLength < 500) || (hasReactOrVue && bodyTextLength < 1000);
+}
+
 // Função para extrair jogos do sokkerpro.com
 function extractMatchesFromSokkerPro(html: string): MatchDetails[] {
   const matches: MatchDetails[] = [];
+  
+  // Verifica se é uma SPA
+  if (isSPA(html)) {
+    console.log('[scrape-sokkerpro] Detectado como SPA - HTML não contém dados renderizados');
+    return matches; // Retorna vazio para que o handler possa dar mensagem apropriada
+  }
   
   // Estratégia 1: Busca por JSON-LD (Schema.org) - igual ao sistema atual
   const jsonScriptRegex = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
@@ -440,20 +460,50 @@ export default async function handler(
         }
       }
       
+      // Verifica se é SPA antes de processar
+      const isSPAPage = isSPA(htmlContent);
+      
+      if (isSPAPage) {
+        return res.status(400).json({ 
+          error: 'Site é uma SPA (Single Page Application)',
+          message: 'O sokkerpro.com é uma aplicação que carrega dados via JavaScript. O HTML inicial não contém os jogos.\n\n' +
+                   '📋 INSTRUÇÕES:\n' +
+                   '1. Abra o site https://sokkerpro.com no navegador\n' +
+                   '2. Aguarde a página carregar completamente (os jogos aparecerem)\n' +
+                   '3. Pressione F12 para abrir o DevTools\n' +
+                   '4. Vá na aba "Elements" (Elementos)\n' +
+                   '5. Clique com botão direito no elemento <html> ou <body>\n' +
+                   '6. Selecione "Copy" > "Copy outerHTML"\n' +
+                   '7. Cole o HTML copiado usando o botão "Colar HTML" no aplicativo\n\n' +
+                   'Ou use a extensão "Save Page WE" para salvar a página completa renderizada.',
+          isSPA: true,
+          debug: {
+            htmlLength: htmlContent.length,
+            hasAppDiv: htmlContent.includes('<div id="app">'),
+            bodyContentLength: (htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] || '').length
+          }
+        });
+      }
+      
       // Extrai os jogos
       const matches = extractMatchesFromSokkerPro(htmlContent);
       console.log('[scrape-sokkerpro] Jogos extraídos:', matches.length);
       
       if (matches.length === 0) {
         return res.status(400).json({ 
-          error: 'Nenhum jogo encontrado no site',
+          error: 'Nenhum jogo encontrado no HTML',
+          message: 'Nenhum jogo foi encontrado no HTML fornecido.\n\n' +
+                   '💡 DICAS:\n' +
+                   '- Se você copiou o HTML inicial da página, tente copiar o HTML renderizado (após a página carregar)\n' +
+                   '- Use F12 > Elements > Copy outerHTML do elemento <html> ou <body>\n' +
+                   '- Ou salve a página completa usando "Save Page WE" ou similar',
           debug: {
             htmlLength: htmlContent.length,
             hasScript: htmlContent.includes('application/ld+json'),
             hasSportsEvent: htmlContent.includes('SportsEvent'),
-            sample: htmlContent.substring(0, 1000)
-          },
-          message: 'Nenhum jogo foi encontrado. Tente colar o HTML manualmente ou verifique se o site está acessível.'
+            hasTable: htmlContent.includes('<table'),
+            sample: htmlContent.substring(0, 500)
+          }
         });
       }
 
