@@ -39,21 +39,21 @@ export const UpdateLiveStatus: React.FC<UpdateLiveStatusProps> = ({ match, onSta
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-white">Atualizar Status ao Vivo e Odds</h3>
+    <div className="bg-gray-800 rounded-lg p-2 sm:p-3 mb-2 sm:mb-3 border border-gray-700">
+      <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+        <h3 className="text-[10px] sm:text-xs font-semibold text-white">Status ao Vivo</h3>
         <button
           onClick={handlePasteHTML}
           disabled={isUpdating}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-xs font-medium transition-colors"
+          className="px-2 py-1 sm:px-2.5 sm:py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[9px] sm:text-[10px] font-medium transition-colors"
         >
-          {isUpdating ? 'Processando...' : 'Colar HTML da Página do Jogo'}
+          {isUpdating ? '...' : '📋 Colar HTML'}
         </button>
       </div>
 
       {message && (
         <div
-          className={`p-2 rounded-md text-xs ${
+          className={`p-1.5 sm:p-2 rounded-md text-[9px] sm:text-[10px] ${
             message.type === 'success'
               ? 'bg-green-900/50 border border-green-700 text-green-200'
               : 'bg-red-900/50 border border-red-700 text-red-200'
@@ -63,8 +63,8 @@ export const UpdateLiveStatus: React.FC<UpdateLiveStatusProps> = ({ match, onSta
         </div>
       )}
 
-      <p className="text-gray-400 text-xs mt-2">
-        💡 <strong>Dica:</strong> Acesse a página do jogo no site e cole o HTML aqui para atualizar status ao vivo e odds
+      <p className="text-gray-400 text-[9px] sm:text-[10px] mt-1.5">
+        💡 Cole o HTML da página do jogo para atualizar status e odds
       </p>
     </div>
   );

@@ -19,26 +19,26 @@ interface GoalAnalysisTabProps {
 
 const CorrectScoreDisplay: React.FC<{ htScores: CorrectScore[], ftScores: CorrectScore[], title: string }> = ({ htScores, ftScores, title }) => (
     <Card title={title}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
             <div>
-                <h5 className="text-sm font-semibold text-center text-gray-400 mb-2">Resultado ao Intervalo</h5>
-                <div className="space-y-2 text-sm">
+                <h5 className="text-[10px] sm:text-xs font-semibold text-center text-gray-400 mb-1.5">Intervalo</h5>
+                <div className="space-y-1 sm:space-y-1.5 text-[10px] sm:text-xs">
                     {htScores.map(cs => (
-                        <div key={cs.score} className="flex justify-between items-center bg-gray-600/50 p-2 rounded">
+                        <div key={cs.score} className="flex justify-between items-center bg-gray-600/50 p-1 sm:p-1.5 rounded">
                             <span className="font-mono font-bold text-white">{cs.score}</span>
-                            <span className="text-gray-300">{cs.count} {cs.count > 1 ? 'jogos' : 'jogo'}</span>
+                            <span className="text-gray-300">{cs.count} {cs.count > 1 ? 'j' : 'j'}</span>
                             <span className="font-semibold text-green-400">{cs.percentage}%</span>
                         </div>
                     ))}
                 </div>
             </div>
              <div>
-                <h5 className="text-sm font-semibold text-center text-gray-400 mb-2">Resultado Final</h5>
-                <div className="space-y-2 text-sm">
+                <h5 className="text-[10px] sm:text-xs font-semibold text-center text-gray-400 mb-1.5">Final</h5>
+                <div className="space-y-1 sm:space-y-1.5 text-[10px] sm:text-xs">
                     {ftScores.map(cs => (
-                        <div key={cs.score} className="flex justify-between items-center bg-gray-600/50 p-2 rounded">
+                        <div key={cs.score} className="flex justify-between items-center bg-gray-600/50 p-1 sm:p-1.5 rounded">
                             <span className="font-mono font-bold text-white">{cs.score}</span>
-                            <span className="text-gray-300">{cs.count} {cs.count > 1 ? 'jogos' : 'jogo'}</span>
+                            <span className="text-gray-300">{cs.count} {cs.count > 1 ? 'j' : 'j'}</span>
                             <span className="font-semibold text-green-400">{cs.percentage}%</span>
                         </div>
                     ))}
@@ -50,18 +50,18 @@ const CorrectScoreDisplay: React.FC<{ htScores: CorrectScore[], ftScores: Correc
 
 const GoalScoringPatternsDisplay: React.FC<{ patterns: GoalScoringPatterns, title: string }> = ({ patterns, title }) => (
      <Card title={title}>
-        <div className="text-sm space-y-3 text-gray-300">
+        <div className="text-[10px] sm:text-xs space-y-1.5 sm:space-2 text-gray-300">
             <div className="flex justify-between items-center">
                 <span>Abre o placar:</span>
-                <span className="font-bold text-white">{patterns.opensScore.pct}% ({patterns.opensScore.games}/{patterns.opensScore.total} jogos)</span>
+                <span className="font-bold text-white">{patterns.opensScore.pct}% ({patterns.opensScore.games}/{patterns.opensScore.total}j)</span>
             </div>
             <div className="flex justify-between items-center">
-                <span>Vence ao abrir o placar:</span>
-                <span className="font-bold text-white">{patterns.winsWhenOpening.pct}% ({patterns.winsWhenOpening.games}/{patterns.winsWhenOpening.total} jogos)</span>
+                <span>Vence ao abrir:</span>
+                <span className="font-bold text-white">{patterns.winsWhenOpening.pct}% ({patterns.winsWhenOpening.games}/{patterns.winsWhenOpening.total}j)</span>
             </div>
             <div className="flex justify-between items-center">
-                <span>Reviravoltas (vitórias de virada):</span>
-                <span className="font-bold text-white">{patterns.comebacks.pct}% ({patterns.comebacks.games}/{patterns.comebacks.total} jogos)</span>
+                <span>Reviravoltas:</span>
+                <span className="font-bold text-white">{patterns.comebacks.pct}% ({patterns.comebacks.games}/{patterns.comebacks.total}j)</span>
             </div>
         </div>
     </Card>
@@ -70,14 +70,14 @@ const GoalScoringPatternsDisplay: React.FC<{ patterns: GoalScoringPatterns, titl
 
 const GoalStatsDisplay: React.FC<{ stats: TeamGoalStats, teamName: string }> = ({ stats, teamName }) => (
     <div>
-        <h4 className="text-lg font-semibold mb-4 text-center text-white">{teamName}</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <StatsCard label="Média Gols Marcados" value={stats.avgGoalsScored.toFixed(2)} />
-            <StatsCard label="Média Gols Sofridos" value={stats.avgGoalsConceded.toFixed(2)} />
-            <StatsCard label="Média Total Gols" value={stats.avgTotalGoals.toFixed(2)} />
+        <h4 className="text-xs sm:text-sm font-semibold mb-2 sm:mb-3 text-center text-white">{teamName}</h4>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+            <StatsCard label="Média Marcados" value={stats.avgGoalsScored.toFixed(2)} />
+            <StatsCard label="Média Sofridos" value={stats.avgGoalsConceded.toFixed(2)} />
+            <StatsCard label="Média Total" value={stats.avgTotalGoals.toFixed(2)} />
             <StatsCard label="> 2.5 Gols" value={`${stats.over25Pct}%`} />
             <StatsCard label="< 2.5 Gols" value={`${stats.under25Pct}%`} />
-            <StatsCard label="Jogos s/ Marcar" value={`${stats.noGoalsScoredPct}%`} />
+            <StatsCard label="s/ Marcar" value={`${stats.noGoalsScoredPct}%`} />
         </div>
         <GoalMomentChart 
             scored={stats.goalMoments.scored} 

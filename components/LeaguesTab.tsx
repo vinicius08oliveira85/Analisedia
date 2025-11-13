@@ -238,24 +238,24 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
   const suggestedLeague = match.matchInfo.competition ? findLeagueByName(match.matchInfo.competition) : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-4">
       {/* Seção de importar dados da competição */}
       <Card title="Importar Dados da Competição" className="border border-purple-500/30">
-        <div className="space-y-4">
-          <p className="text-gray-300 text-sm">
+        <div className="space-y-2 sm:space-y-3">
+          <p className="text-gray-300 text-[10px] sm:text-xs">
             Cole o HTML da página de competição ou faça upload de um arquivo para extrair automaticamente os dados da liga.
           </p>
           
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1 sm:gap-1.5 flex-wrap">
             <button
               onClick={handlePasteHTML}
               disabled={isProcessing}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+              className="px-2 py-1 sm:px-3 sm:py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
             >
-              {isProcessing ? 'Processando...' : 'Colar HTML da Área de Transferência'}
+              {isProcessing ? '...' : '📋 Colar HTML'}
             </button>
-            <label className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors cursor-pointer">
-              {isProcessing ? 'Processando...' : 'Upload de Arquivo HTML'}
+            <label className="px-2 py-1 sm:px-3 sm:py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors cursor-pointer">
+              {isProcessing ? '...' : '📁 Upload'}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -268,58 +268,58 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
             <button
               onClick={handleScrapeFromURL}
               disabled={isProcessing || !formData.competitionUrl?.trim()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+              className="px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
             >
-              {isProcessing ? 'Processando...' : 'Buscar da URL'}
+              {isProcessing ? '...' : '🔗 Buscar URL'}
             </button>
           </div>
 
           {processMessage && (
             <div
-              className={`p-3 rounded-md ${
+              className={`p-2 rounded-md ${
                 processMessage.type === 'success'
                   ? 'bg-green-900/50 border border-green-700 text-green-200'
                   : 'bg-red-900/50 border border-red-700 text-red-200'
               }`}
             >
-              <p className="text-sm">{processMessage.text}</p>
+              <p className="text-[10px] sm:text-xs">{processMessage.text}</p>
             </div>
           )}
 
           {competitionData && (
-            <div className="mt-4 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-              <h4 className="text-white font-semibold mb-2">Dados Extraídos:</h4>
-              <p className="text-gray-300 text-sm mb-2">
+            <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+              <h4 className="text-white font-semibold mb-1.5 text-xs sm:text-sm">Dados Extraídos:</h4>
+              <p className="text-gray-300 text-[10px] sm:text-xs mb-1.5">
                 <strong>Nome:</strong> {competitionData.name}
               </p>
-              <p className="text-gray-300 text-sm mb-2">
+              <p className="text-gray-300 text-[10px] sm:text-xs mb-1.5">
                 <strong>Classificação:</strong> {competitionData.standings.length} times
               </p>
               {competitionData.standings.length > 0 && (
-                <div className="mt-2 max-h-40 overflow-y-auto">
-                  <table className="w-full text-xs text-gray-300">
+                <div className="mt-1.5 max-h-32 sm:max-h-40 overflow-y-auto">
+                  <table className="w-full text-[9px] sm:text-[10px] text-gray-300">
                     <thead>
                       <tr className="border-b border-gray-600">
-                        <th className="text-left p-1">Pos</th>
-                        <th className="text-left p-1">Time</th>
-                        <th className="text-center p-1">Pts</th>
-                        <th className="text-center p-1">J</th>
+                        <th className="text-left p-0.5 sm:p-1">Pos</th>
+                        <th className="text-left p-0.5 sm:p-1">Time</th>
+                        <th className="text-center p-0.5 sm:p-1">Pts</th>
+                        <th className="text-center p-0.5 sm:p-1">J</th>
                       </tr>
                     </thead>
                     <tbody>
                       {competitionData.standings.slice(0, 10).map((standing) => (
                         <tr key={standing.position} className="border-b border-gray-700">
-                          <td className="p-1">{standing.position}</td>
-                          <td className="p-1">{standing.team}</td>
-                          <td className="text-center p-1">{standing.points}</td>
-                          <td className="text-center p-1">{standing.played}</td>
+                          <td className="p-0.5 sm:p-1">{standing.position}</td>
+                          <td className="p-0.5 sm:p-1">{standing.team}</td>
+                          <td className="text-center p-0.5 sm:p-1">{standing.points}</td>
+                          <td className="text-center p-0.5 sm:p-1">{standing.played}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
-              <p className="text-gray-400 text-xs mt-2">
+              <p className="text-gray-400 text-[9px] sm:text-[10px] mt-1.5">
                 💡 Os dados foram preenchidos automaticamente no formulário abaixo. Revise e salve a liga.
               </p>
             </div>
@@ -330,9 +330,9 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
       {/* Formulário de adicionar/editar */}
       {isAdding && (
         <Card title={editingId ? 'Editar Liga' : 'Adicionar Nova Liga'} className="border border-blue-500/30">
-          <div className="space-y-4">
+          <div className="space-y-2 sm:space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-[10px] sm:text-xs font-medium text-gray-300 mb-1">
                 Nome da Liga *
               </label>
               <input
@@ -340,12 +340,12 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
                 value={formData.name || ''}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Ex: Brasileirão Série A"
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-1 sm:px-3 sm:py-1.5 bg-gray-700 border border-gray-600 rounded text-[10px] sm:text-xs text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-[10px] sm:text-xs font-medium text-gray-300 mb-1">
                 URL da Página de Competição
               </label>
               <input
@@ -353,12 +353,12 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
                 value={formData.competitionUrl || ''}
                 onChange={(e) => setFormData({ ...formData, competitionUrl: e.target.value })}
                 placeholder="https://www.academiadasapostasbrasil.com/stats/competition/..."
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-1 sm:px-3 sm:py-1.5 bg-gray-700 border border-gray-600 rounded text-[10px] sm:text-xs text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-[10px] sm:text-xs font-medium text-gray-300 mb-1">
                 URL de Estatísticas (opcional)
               </label>
               <input
@@ -366,13 +366,13 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
                 value={formData.statsUrl || ''}
                 onChange={(e) => setFormData({ ...formData, statsUrl: e.target.value })}
                 placeholder="https://www.academiadasapostasbrasil.com/stats/competition/.../statistics"
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-1 sm:px-3 sm:py-1.5 bg-gray-700 border border-gray-600 rounded text-[10px] sm:text-xs text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-[10px] sm:text-xs font-medium text-gray-300 mb-1">
                   País
                 </label>
                 <input
@@ -380,12 +380,12 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
                   value={formData.country || ''}
                   onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                   placeholder="Ex: Brasil"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-1 sm:px-3 sm:py-1.5 bg-gray-700 border border-gray-600 rounded text-[10px] sm:text-xs text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-[10px] sm:text-xs font-medium text-gray-300 mb-1">
                   Temporada
                 </label>
                 <input
@@ -393,21 +393,21 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected 
                   value={formData.season || ''}
                   onChange={(e) => setFormData({ ...formData, season: e.target.value })}
                   placeholder="Ex: 2024"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-1 sm:px-3 sm:py-1.5 bg-gray-700 border border-gray-600 rounded text-[10px] sm:text-xs text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition-colors"
+                className="px-2 py-1 sm:px-3 sm:py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
               >
-                {editingId ? 'Salvar Alterações' : 'Adicionar Liga'}
+                {editingId ? 'Salvar' : 'Adicionar'}
               </button>
               <button
                 onClick={handleCancel}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md font-medium transition-colors"
+                className="px-2 py-1 sm:px-3 sm:py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
               >
                 Cancelar
               </button>

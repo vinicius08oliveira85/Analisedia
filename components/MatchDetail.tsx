@@ -141,27 +141,27 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
     <div>
         <button 
             onClick={onBack}
-            className="mb-6 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center"
+            className="mb-2 sm:mb-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-1 px-2 sm:py-1.5 sm:px-3 rounded text-[10px] sm:text-xs transition-colors duration-200 flex items-center"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
             </svg>
-            Voltar para a lista de jogos
+            Voltar
         </button>
         {isLoadingDetails && (
-          <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-4 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-400"></div>
-              <p className="text-blue-200 text-sm">Carregando detalhes da partida automaticamente...</p>
+          <div className="bg-blue-900/50 border border-blue-700 rounded-lg p-2 sm:p-3 mb-2 sm:mb-3">
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-blue-400"></div>
+              <p className="text-blue-200 text-[10px] sm:text-xs">Carregando detalhes...</p>
             </div>
           </div>
         )}
         {detailsError && (
-          <div className="bg-yellow-900/50 border border-yellow-700 rounded-lg p-4 mb-4">
-            <p className="text-yellow-200 text-sm">
-              ⚠️ Não foi possível carregar detalhes automaticamente: {detailsError}
+          <div className="bg-yellow-900/50 border border-yellow-700 rounded-lg p-2 sm:p-3 mb-2 sm:mb-3">
+            <p className="text-yellow-200 text-[10px] sm:text-xs">
+              ⚠️ Erro ao carregar: {detailsError}
             </p>
-            <p className="text-yellow-300 text-xs mt-1">
+            <p className="text-yellow-300 text-[9px] sm:text-[10px] mt-0.5">
               Use o botão abaixo para atualizar manualmente.
             </p>
           </div>
@@ -178,9 +178,9 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
           liveStatus={currentMatch.liveStatus}
           odds={currentMatch.odds}
         />
-        <div className="mt-8">
+        <div className="mt-3 sm:mt-4">
             <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />
-            <div className="mt-0 bg-gray-800 rounded-b-lg shadow-lg p-4 md:p-6">
+            <div className="mt-0 bg-gray-800 rounded-b-lg shadow-lg p-2 sm:p-3 md:p-4">
                 {renderTabContent()}
             </div>
         </div>

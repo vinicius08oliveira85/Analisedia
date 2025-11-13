@@ -47,26 +47,26 @@ const OpponentAnalysisDisplay: React.FC<{ analysis: OpponentAnalysisMatch[], tit
     return (
         <Card title={title} className="col-span-1 md:col-span-1">
              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                    <thead className="text-xs text-gray-400 uppercase">
+                <table className="min-w-full text-[10px] sm:text-xs">
+                    <thead className="text-[9px] sm:text-[10px] text-gray-400 uppercase">
                         <tr>
-                            <th className="p-2 text-left">Adv.</th>
-                            <th className="p-2 text-center">Resultado</th>
-                            <th className="p-2 text-center">Placar</th>
-                            <th className="p-2 text-right">1º Gol</th>
+                            <th className="p-1 sm:p-1.5 text-left">Adv.</th>
+                            <th className="p-1 sm:p-1.5 text-center">Res.</th>
+                            <th className="p-1 sm:p-1.5 text-center">Placar</th>
+                            <th className="p-1 sm:p-1.5 text-right">1º Gol</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700">
                         {analysis.slice(0, 10).map((match, index) => (
                             <tr key={index} className={`hover:bg-gray-700 ${getQuartile(match.opponentRank)}`}>
-                                <td className="p-2 whitespace-nowrap"><span className="font-semibold">{match.opponentRank}º</span> {match.homeTeam === teamName ? match.awayTeam : match.homeTeam}</td>
-                                <td className="p-2 text-center">
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold text-white ${getResultColor(match.result)}`}>
+                                <td className="p-1 sm:p-1.5 whitespace-nowrap"><span className="font-semibold">{match.opponentRank}º</span> {match.homeTeam === teamName ? match.awayTeam : match.homeTeam}</td>
+                                <td className="p-1 sm:p-1.5 text-center">
+                                    <span className={`px-1 sm:px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold text-white ${getResultColor(match.result)}`}>
                                         {match.result}
                                     </span>
                                 </td>
-                                <td className="p-2 text-center font-mono">{match.score}</td>
-                                <td className="p-2 text-right text-gray-400">{match.firstGoal}</td>
+                                <td className="p-1 sm:p-1.5 text-center font-mono">{match.score}</td>
+                                <td className="p-1 sm:p-1.5 text-right text-gray-400">{match.firstGoal}</td>
                             </tr>
                         ))}
                     </tbody>

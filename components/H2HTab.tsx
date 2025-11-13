@@ -9,14 +9,14 @@ interface H2HTabProps {
 export const H2HTab: React.FC<H2HTabProps> = ({ h2hData }) => {
   return (
     <div>
-      <h3 className="text-xl font-bold mb-4 text-green-400">Confronto Direto (Últimos Jogos)</h3>
+      <h3 className="text-sm sm:text-base font-bold mb-2 sm:mb-3 text-green-400">Confronto Direto</h3>
       <div className="max-w-2xl mx-auto">
         {h2hData.length > 0 ? (
             h2hData.map((match, index) => (
                 <MatchCard key={index} match={match} />
             ))
         ) : (
-            <p className="text-gray-400 text-center">Não há dados de confronto direto recentes.</p>
+            <p className="text-gray-400 text-center text-[10px] sm:text-xs">Não há dados de confronto direto recentes.</p>
         )}
       </div>
     </div>

@@ -41,8 +41,8 @@ export const LeaguesView: React.FC<LeaguesViewProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-green-400 mb-4 text-center">
+    <div className="space-y-3 sm:space-y-4">
+      <h2 className="text-sm sm:text-base font-bold text-green-400 mb-2 sm:mb-3 text-center">
         Jogos por Liga ({leagues.length} ligas)
       </h2>
       
@@ -55,16 +55,16 @@ export const LeaguesView: React.FC<LeaguesViewProps> = ({
           <div key={league.leagueName} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
             <button
               onClick={() => toggleLeague(league.leagueName)}
-              className="w-full px-6 py-4 bg-gray-700 hover:bg-gray-600 transition-colors flex items-center justify-between"
+              className="w-full px-2 sm:px-3 py-2 sm:py-2.5 bg-gray-700 hover:bg-gray-600 transition-colors flex items-center justify-between"
             >
-              <div className="flex items-center gap-3">
-                <span className="text-xl font-bold text-white">{league.leagueName}</span>
-                <span className="text-sm text-gray-400">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs sm:text-sm font-bold text-white">{league.leagueName}</span>
+                <span className="text-[10px] sm:text-xs text-gray-400">
                   ({league.matches.length} {league.matches.length === 1 ? 'jogo' : 'jogos'})
                 </span>
               </div>
               <svg
-                className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -74,11 +74,11 @@ export const LeaguesView: React.FC<LeaguesViewProps> = ({
             </button>
 
             {isExpanded && (
-              <div className="p-4 space-y-4">
+              <div className="p-2 sm:p-3 space-y-2 sm:space-y-3">
                 {favoritedMatches.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-semibold text-yellow-400 mb-2">Favoritos</h4>
-                    <div className="space-y-2">
+                  <div className="mb-2 sm:mb-3">
+                    <h4 className="text-[10px] sm:text-xs font-semibold text-yellow-400 mb-1.5">Favoritos</h4>
+                    <div className="space-y-1.5">
                       {favoritedMatches.map(match => (
                         <MatchListItem
                           key={match.id}
@@ -92,7 +92,7 @@ export const LeaguesView: React.FC<LeaguesViewProps> = ({
                   </div>
                 )}
                 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {otherMatches.map(match => (
                     <MatchListItem
                       key={match.id}
