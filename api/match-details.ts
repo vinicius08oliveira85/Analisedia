@@ -1269,41 +1269,42 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
     console.log(`[extractGoalStats] Encontradas ${rows.length} linhas na tabela`);
     
     for (const row of rows) {
-      // Extrai células da linha
+      // Extrai células da linha - usa cleanHTMLText para garantir limpeza correta
       const cells: string[] = [];
       const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
       let cellMatch;
       while ((cellMatch = cellRegex.exec(row)) !== null) {
-        let cellText = cellMatch[1]
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        const cellText = cleanHTMLText(cellMatch[1]);
         cells.push(cellText);
       }
       
-      if (cells.length < 4) continue;
+      if (cells.length < 4) {
+        console.log(`[extractGoalStats] Linha ignorada: apenas ${cells.length} células (esperado: 4+)`);
+        continue;
+      }
       
       // Primeira célula é o label (ex: "Média de gols marcados por jogo")
-      const label = cells[0].toLowerCase();
+      const label = cells[0].toLowerCase().trim();
       
       // Determina qual coluna usar baseado no escopo
       // Formato: [Label, Casa, Fora, Global] - índices: 0, 1, 2, 3
       const colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 3;
-      const value = cells[colIndex] || '';
+      const value = (cells[colIndex] || '').trim();
+      
+      console.log(`[extractGoalStats] Processando linha: "${label}" | Coluna ${colIndex} (${scope}): "${value}"`);
       
       // Extrai valores numéricos
       if (label.includes('média de gols marcados') || label.includes('média gols marcados')) {
         const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
         if (numValue > 0) {
           defaultStats.avgGoalsScored = numValue;
-          console.log(`[extractGoalStats] ✓ Média gols marcados (${scope}): ${numValue} (da célula ${colIndex})`);
+          console.log(`[extractGoalStats] ✓✓✓ Média gols marcados (${scope}): ${numValue} (da célula ${colIndex}: "${value}")`);
         }
       } else if (label.includes('média de gols sofridos') || label.includes('média gols sofridos')) {
         const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
         if (numValue > 0) {
           defaultStats.avgGoalsConceded = numValue;
-          console.log(`[extractGoalStats] ✓ Média gols sofridos (${scope}): ${numValue} (da célula ${colIndex})`);
+          console.log(`[extractGoalStats] ✓✓✓ Média gols sofridos (${scope}): ${numValue} (da célula ${colIndex}: "${value}")`);
         }
       } else if (label.includes('média de gols marcados+sofridos') || label.includes('média total')) {
         const numValue = parseFloat(value.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
@@ -1339,7 +1340,7 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
       }
     }
   } else {
-    console.log(`[extractGoalStats] ⚠ Nenhuma tabela stat-last10 encontrada para ${teamName}`);
+    console.log(`[extractGoalStats] ⚠ Nenhuma tabela stat-last10 ou stat-seqs encontrada para ${teamName}`);
   }
   
   // Calcula média total se não foi encontrada diretamente
