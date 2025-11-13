@@ -1254,6 +1254,8 @@ export default async function handler(
 
       console.log('Match Info extraído:', matchInfo);
       console.log('Procurando dados para:', matchInfo.teamA, 'vs', matchInfo.teamB);
+      console.log('Competição:', matchInfo.competition);
+      console.log('URL do jogo processada (matchId):', matchId);
 
       // NOVA ABORDAGEM: Extrai todas as informações diretamente do HTML pela estrutura
       // Identifica qual tabela pertence a qual time pelo nome encontrado no HTML
@@ -1298,17 +1300,46 @@ export default async function handler(
         global: teamBOpponentAnalysis.global.length
       });
       
-      // 4. Extrai H2H
-      const h2hData = extractH2HMatches(html);
-      console.log(`H2H: ${h2hData.length} jogos extraídos`);
+      // 4. Extrai H2H (apenas jogos entre os dois times do jogo atual)
+      console.log('=== Extraindo H2H ===');
+      const allH2HMatches = extractH2HMatches(html);
+      // Filtra apenas jogos entre os dois times do jogo atual
+      const h2hData = allH2HMatches.filter(match => {
+        const homeNormalized = normalizeTeamName(match.homeTeam);
+        const awayNormalized = normalizeTeamName(match.awayTeam);
+        const teamANormalized = normalizeTeamName(matchInfo.teamA);
+        const teamBNormalized = normalizeTeamName(matchInfo.teamB);
+        
+        return (homeNormalized === teamANormalized && awayNormalized === teamBNormalized) ||
+               (homeNormalized === teamBNormalized && awayNormalized === teamANormalized) ||
+               homeNormalized.includes(teamANormalized) && awayNormalized.includes(teamBNormalized) ||
+               homeNormalized.includes(teamBNormalized) && awayNormalized.includes(teamANormalized);
+      });
+      console.log(`H2H: ${h2hData.length} jogos entre ${matchInfo.teamA} e ${matchInfo.teamB} (de ${allH2HMatches.length} total)`);
 
-      // 5. Extrai classificação
+      // 5. Extrai classificação (da competição do jogo atual)
       console.log('=== Extraindo Classificação ===');
-      const standingsData = extractStandings(html);
-      console.log(`Classificação: ${standingsData.length} times encontrados`);
+      const allStandings = extractStandings(html);
+      // Filtra apenas times que fazem parte da competição do jogo
+      // Se a competição for conhecida, filtra por ela; senão, pega todos
+      const standingsData = allStandings.filter(standing => {
+        // Verifica se o time está relacionado aos times do jogo ou à competição
+        const teamNormalized = normalizeTeamName(standing.team);
+        const teamANormalized = normalizeTeamName(matchInfo.teamA);
+        const teamBNormalized = normalizeTeamName(matchInfo.teamB);
+        
+        // Se encontrar um dos times do jogo na classificação, assume que é a competição correta
+        return teamNormalized === teamANormalized || 
+               teamNormalized === teamBNormalized ||
+               teamNormalized.includes(teamANormalized) ||
+               teamNormalized.includes(teamBNormalized) ||
+               allStandings.length <= 10; // Se tiver poucos times, provavelmente é a competição correta
+      });
+      console.log(`Classificação: ${standingsData.length} times encontrados (de ${allStandings.length} total) para competição: ${matchInfo.competition}`);
 
-      // 6. Extrai estatísticas de gols
+      // 6. Extrai estatísticas de gols (dos times específicos do jogo)
       console.log('=== Extraindo Estatísticas de Gols ===');
+      // Garante que estamos extraindo dos times corretos
       const teamAGoalStats = {
         home: extractGoalStats(html, matchInfo.teamA, 'home'),
         away: extractGoalStats(html, matchInfo.teamA, 'away'),
