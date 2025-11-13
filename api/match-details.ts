@@ -1304,17 +1304,21 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
     console.log(`[extractGoalStats] Encontradas ${rows.length} linhas na tabela`);
     
     for (const row of rows) {
-      // Extrai células da linha - usa cleanHTMLText para garantir limpeza correta
+      // Extrai células da linha - IMPORTANTE: precisa pegar TODAS as células, incluindo vazias
       const cells: string[] = [];
       const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
       let cellMatch;
+      let lastIndex = 0;
+      
+      // Extrai células preservando ordem e índices
       while ((cellMatch = cellRegex.exec(row)) !== null) {
         const cellText = cleanHTMLText(cellMatch[1]);
         cells.push(cellText);
+        lastIndex = cellMatch.index + cellMatch[0].length;
       }
       
       if (cells.length < 4) {
-        console.log(`[extractGoalStats] Linha ignorada: apenas ${cells.length} células (esperado: 4+)`);
+        console.log(`[extractGoalStats] Linha ignorada: apenas ${cells.length} células (esperado: 4+). Células: [${cells.map((c, i) => `${i}:"${c}"`).join(', ')}]`);
         continue;
       }
       
@@ -1326,6 +1330,8 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
       const colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 3;
       const value = (cells[colIndex] || '').trim();
       
+      // Debug: mostra todas as células para entender a estrutura
+      console.log(`[extractGoalStats] Linha completa - Label: "${label}" | Células [${cells.map((c, i) => `${i}:"${c.substring(0, 20)}"`).join(', ')}]`);
       console.log(`[extractGoalStats] Processando linha: "${label}" | Coluna ${colIndex} (${scope}): "${value}"`);
       
       // Extrai valores numéricos - usa parseNumericValue que é mais robusto
@@ -1710,6 +1716,17 @@ export default async function handler(
         away: `Marcados=${teamBGoalStats.away.avgGoalsScored}, Sofridos=${teamBGoalStats.away.avgGoalsConceded}`,
         global: `Marcados=${teamBGoalStats.global.avgGoalsScored}, Sofridos=${teamBGoalStats.global.avgGoalsConceded}`
       });
+      
+      // Log detalhado dos resultados
+      console.log(`=== RESUMO GOAL STATS ===`);
+      console.log(`Time A (${matchInfo.teamA}):`);
+      console.log(`  Casa: Marcados=${teamAGoalStats.home.avgGoalsScored}, Sofridos=${teamAGoalStats.home.avgGoalsConceded}, >2.5=${teamAGoalStats.home.over25Pct}%`);
+      console.log(`  Fora: Marcados=${teamAGoalStats.away.avgGoalsScored}, Sofridos=${teamAGoalStats.away.avgGoalsConceded}, >2.5=${teamAGoalStats.away.over25Pct}%`);
+      console.log(`  Global: Marcados=${teamAGoalStats.global.avgGoalsScored}, Sofridos=${teamAGoalStats.global.avgGoalsConceded}, >2.5=${teamAGoalStats.global.over25Pct}%`);
+      console.log(`Time B (${matchInfo.teamB}):`);
+      console.log(`  Casa: Marcados=${teamBGoalStats.home.avgGoalsScored}, Sofridos=${teamBGoalStats.home.avgGoalsConceded}, >2.5=${teamBGoalStats.home.over25Pct}%`);
+      console.log(`  Fora: Marcados=${teamBGoalStats.away.avgGoalsScored}, Sofridos=${teamBGoalStats.away.avgGoalsConceded}, >2.5=${teamBGoalStats.away.over25Pct}%`);
+      console.log(`  Global: Marcados=${teamBGoalStats.global.avgGoalsScored}, Sofridos=${teamBGoalStats.global.avgGoalsConceded}, >2.5=${teamBGoalStats.global.over25Pct}%`);
       
       console.log(`Goal Stats extraídos: ${matchInfo.teamA} (Casa: ${teamAGoalStats.home.avgGoalsScored}, Fora: ${teamAGoalStats.away.avgGoalsScored}) e ${matchInfo.teamB} (Casa: ${teamBGoalStats.home.avgGoalsScored}, Fora: ${teamBGoalStats.away.avgGoalsScored})`);
 
