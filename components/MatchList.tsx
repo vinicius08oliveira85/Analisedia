@@ -17,11 +17,26 @@ export const MatchList: React.FC<MatchListProps> = ({ matches, onSelectMatch, fa
     <MatchListItem 
       key={match.id} 
       match={match} 
-      onClick={() => onSelectMatch(match.id)}
+      onClick={() => {
+        console.log('Clicou no jogo:', match.id);
+        onSelectMatch(match.id);
+      }}
       isFavorite={favorites.includes(match.id)}
       onToggleFavorite={onToggleFavorite}
     />
   ));
+
+  if (matches.length === 0) {
+    return (
+      <div>
+        <h2 className="text-3xl font-bold text-green-400 mb-6 text-center">Jogos do Dia</h2>
+        <div className="bg-gray-800 rounded-lg p-8 text-center border border-gray-700">
+          <p className="text-gray-400 text-lg mb-4">Nenhum jogo encontrado para hoje.</p>
+          <p className="text-gray-500 text-sm">Atualize os jogos usando o botão acima para ver os jogos do dia.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

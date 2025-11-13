@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { MatchList } from './components/MatchList';
 import { MatchDetail } from './components/MatchDetail';
@@ -6,6 +6,7 @@ import { UpdateMatches } from './components/UpdateMatches';
 import { LiveStatusControl } from './components/LiveStatusControl';
 import { useLiveStatusPolling } from './hooks/useLiveStatusPolling';
 import { allMatchesData } from './data';
+import { filterTodayAndFutureMatches, cleanOldMatchesFromStorage } from './utils/dateUtils';
 import type { MatchDetails } from './types';
 
 const App: React.FC = () => {
@@ -29,14 +30,26 @@ const App: React.FC = () => {
     }
   }, [favorites]);
 
-  // Carrega jogos salvos do localStorage ao iniciar
+  // Limpa jogos antigos do localStorage ao iniciar
+  useEffect(() => {
+    cleanOldMatchesFromStorage();
+  }, []);
+
+  // Carrega jogos salvos do localStorage ao iniciar (apenas jogos de hoje/futuros)
   useEffect(() => {
     try {
       const savedMatches = window.localStorage.getItem('updatedMatches');
       if (savedMatches) {
         const parsedMatches = JSON.parse(savedMatches);
         if (Array.isArray(parsedMatches) && parsedMatches.length > 0) {
-          setMatches(parsedMatches);
+          // Filtra apenas jogos de hoje ou futuros
+          const filteredMatches = filterTodayAndFutureMatches(parsedMatches);
+          if (filteredMatches.length > 0) {
+            setMatches(filteredMatches);
+          } else {
+            // Se não há jogos válidos, usa os dados padrão
+            setMatches(allMatchesData);
+          }
         }
       }
     } catch (error) {
@@ -45,20 +58,31 @@ const App: React.FC = () => {
   }, []);
 
   const handleMatchesUpdated = (updatedMatches: MatchDetails[]) => {
+    // Filtra apenas jogos de hoje ou futuros antes de salvar
+    const filteredMatches = filterTodayAndFutureMatches(updatedMatches);
+    
     // Salva no localStorage
     try {
-      window.localStorage.setItem('updatedMatches', JSON.stringify(updatedMatches));
+      if (filteredMatches.length > 0) {
+        window.localStorage.setItem('updatedMatches', JSON.stringify(filteredMatches));
+      } else {
+        // Se não há jogos válidos, remove do localStorage
+        window.localStorage.removeItem('updatedMatches');
+      }
     } catch (error) {
       console.error("Could not save matches to localStorage", error);
     }
-    setMatches(updatedMatches);
+    setMatches(filteredMatches.length > 0 ? filteredMatches : allMatchesData);
     setSelectedMatch(null); // Volta para a lista
   };
 
   const handleSelectMatch = (matchId: string) => {
-    const match = matches.find(m => m.id === matchId);
+    // Busca primeiro nos jogos filtrados, depois em todos
+    const match = todayMatches.find(m => m.id === matchId) || matches.find(m => m.id === matchId);
     if (match) {
       setSelectedMatch(match);
+    } else {
+      console.warn('Jogo não encontrado:', matchId);
     }
   };
 
@@ -76,10 +100,15 @@ const App: React.FC = () => {
     });
   };
 
+  // Filtra jogos para mostrar apenas os de hoje ou futuros
+  const todayMatches = useMemo(() => {
+    return filterTodayAndFutureMatches(matches);
+  }, [matches]);
+
   // Polling automático para jogos ao vivo
-  const liveMatches = matches.filter(m => m.liveStatus?.isLive);
+  const liveMatches = todayMatches.filter(m => m.liveStatus?.isLive);
   const { isPolling, startPolling, stopPolling } = useLiveStatusPolling(
-    matches,
+    todayMatches,
     handleMatchesUpdated,
     {
       intervalMs: 30000, // 30 segundos
@@ -111,7 +140,7 @@ const App: React.FC = () => {
           />
         ) : (
           <MatchList 
-            matches={matches} 
+            matches={todayMatches} 
             onSelectMatch={handleSelectMatch}
             favorites={favorites}
             onToggleFavorite={handleToggleFavorite}
