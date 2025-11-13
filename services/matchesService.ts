@@ -9,27 +9,6 @@ export interface UpdateMatchesResponse {
   message: string;
 }
 
-export interface ScrapeMatchesResponse {
-  success: boolean;
-  partial?: boolean;
-  totalMatches: number;
-  matches: Array<MatchDetails & { sourceUrl?: string }>;
-  groupedByCompetition: Array<{
-    competition: string;
-    count: number;
-    matches: Array<MatchDetails & { sourceUrl?: string }>;
-  }>;
-  sources: Array<{
-    url: string;
-    matchCount: number;
-    competitions: string[];
-    success: boolean;
-    error?: string;
-  }>;
-  errors?: Array<{ url: string; message: string }>;
-  message: string;
-}
-
 /**
  * Atualiza os jogos do dia enviando o HTML para a API processar
  */
@@ -103,31 +82,5 @@ export async function uploadMatchesFile(file: File): Promise<UpdateMatchesRespon
     
     reader.readAsText(file);
   });
-}
-
-/**
- * Realiza scraping diretamente do site usando as URLs fornecidas
- */
-export async function scrapeMatchesFromSite(urls: string[]): Promise<ScrapeMatchesResponse> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/scrape-matches`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ urls }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido ao realizar scraping' }));
-      throw new Error(errorData.error || `Erro HTTP: ${response.status}`);
-    }
-
-    const data: ScrapeMatchesResponse = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Erro ao realizar scraping direto do site:', error);
-    throw error;
-  }
 }
 

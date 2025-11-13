@@ -4,6 +4,7 @@ import { MatchList } from './components/MatchList';
 import { MatchDetail } from './components/MatchDetail';
 import { UpdateMatches } from './components/UpdateMatches';
 import { LiveStatusControl } from './components/LiveStatusControl';
+import { LeaguesView } from './components/LeaguesView';
 import { useLiveStatusPolling } from './hooks/useLiveStatusPolling';
 import { allMatchesData } from './data';
 import { filterTodayAndFutureMatches, cleanOldMatchesFromStorage } from './utils/dateUtils';
@@ -12,6 +13,8 @@ import type { MatchDetails } from './types';
 const App: React.FC = () => {
   const [matches, setMatches] = useState<MatchDetails[]>(allMatchesData);
   const [selectedMatch, setSelectedMatch] = useState<MatchDetails | null>(null);
+  const [leagues, setLeagues] = useState<Array<{ leagueName: string; matches: MatchDetails[] }>>([]);
+  const [viewMode, setViewMode] = useState<'list' | 'leagues'>('list');
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
       const savedFavorites = window.localStorage.getItem('favoriteMatches');
@@ -76,6 +79,20 @@ const App: React.FC = () => {
     setSelectedMatch(null); // Volta para a lista
   };
 
+  const handleLeaguesUpdated = (updatedLeagues: Array<{ leagueName: string; matches: MatchDetails[] }>) => {
+    // Filtra jogos de hoje/futuros em cada liga
+    const filteredLeagues = updatedLeagues.map(league => ({
+      leagueName: league.leagueName,
+      matches: filterTodayAndFutureMatches(league.matches)
+    })).filter(league => league.matches.length > 0);
+    
+    setLeagues(filteredLeagues);
+    // Se há ligas, muda para visualização por ligas
+    if (filteredLeagues.length > 0) {
+      setViewMode('leagues');
+    }
+  };
+
   const handleSelectMatch = (matchId: string) => {
     // Busca primeiro nos jogos filtrados, depois em todos
     const match = todayMatches.find(m => m.id === matchId) || matches.find(m => m.id === matchId);
@@ -122,7 +139,34 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!selectedMatch && (
           <>
-            <UpdateMatches onMatchesUpdated={handleMatchesUpdated} />
+            <UpdateMatches 
+              onMatchesUpdated={handleMatchesUpdated} 
+              onLeaguesUpdated={handleLeaguesUpdated}
+            />
+            {leagues.length > 0 && (
+              <div className="mb-4 flex gap-2 justify-end">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Lista
+                </button>
+                <button
+                  onClick={() => setViewMode('leagues')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'leagues'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Por Liga ({leagues.length})
+                </button>
+              </div>
+            )}
             <LiveStatusControl
               isPolling={isPolling}
               onStart={startPolling}
@@ -136,6 +180,13 @@ const App: React.FC = () => {
             match={selectedMatch} 
             onBack={handleBackToList}
             isFavorite={favorites.includes(selectedMatch.id)}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        ) : viewMode === 'leagues' && leagues.length > 0 ? (
+          <LeaguesView
+            leagues={leagues}
+            onSelectMatch={handleSelectMatch}
+            favorites={favorites}
             onToggleFavorite={handleToggleFavorite}
           />
         ) : (
