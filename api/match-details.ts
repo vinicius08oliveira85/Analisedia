@@ -1143,12 +1143,6 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
     console.log(`[extractGoalStats] Seção específica do time encontrada para ${teamName}`);
   }
   
-  // Busca a seção específica do time
-  const teamSectionRegex = new RegExp(
-    `<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>[^<]*${normalizedTeam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^<]*</span>[\\s\\S]*?Média de gols marcados[\\s\\S]*?${scope === 'home' ? 'Casa' : scope === 'away' ? 'Fora' : 'Global'}[\\s\\S]*?(\\d+\\.?\\d*)`,
-    'i'
-  );
-  
   // Tenta múltiplas estratégias para encontrar os dados
   // Estratégia 1: Busca na seção completa de gols
   const scopeLabel = scope === 'home' ? 'Casa' : scope === 'away' ? 'Fora' : 'Global';
