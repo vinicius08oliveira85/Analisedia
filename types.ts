@@ -55,17 +55,6 @@ export interface MatchInfo {
     url?: string; // URL da página de detalhes do jogo
 }
 
-export interface League {
-    id: string;
-    name: string;
-    competitionUrl?: string; // URL da página de competição/liga
-    country?: string;
-    season?: string;
-    notes?: string;
-    createdAt: string;
-    updatedAt: string;
-}
-
 export interface MatchOdds {
     homeWin?: number;
     draw?: number;

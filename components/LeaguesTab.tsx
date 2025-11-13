@@ -1,87 +1,77 @@
 import React, { useState, useEffect } from 'react';
+import { loadLeagues, addLeague, updateLeague, deleteLeague, findLeagueByName, type League } from '../services/leagueService';
 import { Card } from './Card';
-import type { League, MatchDetails } from '../types';
-import { getLeagues, saveLeague, deleteLeague } from '../services/leagueService';
+import type { MatchDetails } from '../types';
 
 interface LeaguesTabProps {
-  currentMatch?: MatchDetails; // Opcional - para sincronizar com partida atual
-  onLeagueSelected?: (league: League) => void; // Callback quando uma liga é selecionada
+  match: MatchDetails;
+  onLeagueSelected?: (league: League) => void;
 }
 
-export const LeaguesTab: React.FC<LeaguesTabProps> = ({ currentMatch, onLeagueSelected }) => {
+export const LeaguesTab: React.FC<LeaguesTabProps> = ({ match, onLeagueSelected }) => {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<League>>({
     name: '',
     competitionUrl: '',
+    statsUrl: '',
     country: '',
     season: '',
-    notes: ''
   });
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(
-    currentMatch ? findLeagueForMatch(currentMatch, leagues)?.id || null : null
-  );
 
   useEffect(() => {
-    loadLeagues();
-  }, []);
-
-  useEffect(() => {
-    if (currentMatch && leagues.length > 0) {
-      const matchingLeague = findLeagueForMatch(currentMatch, leagues);
+    setLeagues(loadLeagues());
+    
+    // Tenta encontrar liga correspondente à competição do jogo
+    if (match.matchInfo.competition) {
+      const matchingLeague = findLeagueByName(match.matchInfo.competition);
       if (matchingLeague) {
-        setSelectedLeagueId(matchingLeague.id);
+        setFormData({
+          name: matchingLeague.name,
+          competitionUrl: matchingLeague.competitionUrl || '',
+          statsUrl: matchingLeague.statsUrl || '',
+          country: matchingLeague.country || '',
+          season: matchingLeague.season || '',
+        });
+      } else {
+        // Preenche com dados da competição atual
+        setFormData(prev => ({
+          ...prev,
+          name: match.matchInfo.competition,
+        }));
       }
     }
-  }, [currentMatch, leagues]);
-
-  function findLeagueForMatch(match: MatchDetails, leaguesList: League[]): League | null {
-    const competitionName = match.matchInfo.competition.toLowerCase();
-    return leaguesList.find(league => 
-      league.name.toLowerCase() === competitionName ||
-      competitionName.includes(league.name.toLowerCase()) ||
-      league.name.toLowerCase().includes(competitionName)
-    ) || null;
-  }
-
-  const loadLeagues = () => {
-    const savedLeagues = getLeagues();
-    setLeagues(savedLeagues);
-  };
+  }, [match]);
 
   const handleSave = () => {
-    if (!formData.name || formData.name.trim() === '') {
-      setMessage({ type: 'error', text: 'O nome da liga é obrigatório' });
+    if (!formData.name?.trim()) {
+      alert('Nome da liga é obrigatório');
       return;
     }
 
     try {
-      const league: League = editingId 
-        ? {
-            ...leagues.find(l => l.id === editingId)!,
-            ...formData,
-            name: formData.name!,
-            updatedAt: new Date().toISOString()
-          }
-        : {
-            id: `league-${Date.now()}`,
-            name: formData.name!,
-            competitionUrl: formData.competitionUrl || undefined,
-            country: formData.country || undefined,
-            season: formData.season || undefined,
-            notes: formData.notes || undefined,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-
-      saveLeague(league);
-      loadLeagues();
-      resetForm();
-      setMessage({ type: 'success', text: editingId ? 'Liga atualizada com sucesso!' : 'Liga adicionada com sucesso!' });
+      if (editingId) {
+        const updated = updateLeague(editingId, formData);
+        if (updated) {
+          setLeagues(loadLeagues());
+          setEditingId(null);
+          setIsAdding(false);
+          setFormData({ name: '', competitionUrl: '', statsUrl: '', country: '', season: '' });
+        }
+      } else {
+        const newLeague = addLeague(formData as Omit<League, 'id' | 'createdAt' | 'updatedAt'>);
+        setLeagues(loadLeagues());
+        setIsAdding(false);
+        setFormData({ name: '', competitionUrl: '', statsUrl: '', country: '', season: '' });
+        
+        // Se há callback, notifica a seleção
+        if (onLeagueSelected) {
+          onLeagueSelected(newLeague);
+        }
+      }
     } catch (error) {
-      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Erro ao salvar liga' });
+      alert('Erro ao salvar liga: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   };
 
@@ -89,9 +79,9 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ currentMatch, onLeagueSe
     setFormData({
       name: league.name,
       competitionUrl: league.competitionUrl || '',
+      statsUrl: league.statsUrl || '',
       country: league.country || '',
       season: league.season || '',
-      notes: league.notes || ''
     });
     setEditingId(league.id);
     setIsAdding(true);
@@ -99,67 +89,32 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ currentMatch, onLeagueSe
 
   const handleDelete = (id: string) => {
     if (confirm('Tem certeza que deseja excluir esta liga?')) {
-      deleteLeague(id);
-      loadLeagues();
-      setMessage({ type: 'success', text: 'Liga excluída com sucesso!' });
+      if (deleteLeague(id)) {
+        setLeagues(loadLeagues());
+      }
     }
   };
 
-  const handleSelect = (league: League) => {
-    setSelectedLeagueId(league.id);
+  const handleUseLeague = (league: League) => {
     if (onLeagueSelected) {
       onLeagueSelected(league);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      competitionUrl: '',
-      country: '',
-      season: '',
-      notes: ''
-    });
+  const handleCancel = () => {
     setIsAdding(false);
     setEditingId(null);
+    setFormData({ name: '', competitionUrl: '', statsUrl: '', country: '', season: '' });
   };
 
-  const handleSyncWithMatch = (league: League) => {
-    if (currentMatch && onLeagueSelected) {
-      onLeagueSelected(league);
-      setMessage({ 
-        type: 'success', 
-        text: `Liga "${league.name}" sincronizada com a partida "${currentMatch.teamA.name} vs ${currentMatch.teamB.name}"` 
-      });
-    }
-  };
+  // Sugestão baseada na competição do jogo atual
+  const suggestedLeague = match.matchInfo.competition ? findLeagueByName(match.matchInfo.competition) : null;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-white">Gerenciar Ligas</h2>
-        <button
-          onClick={() => setIsAdding(!isAdding)}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium transition-colors"
-        >
-          {isAdding ? 'Cancelar' : '+ Adicionar Liga'}
-        </button>
-      </div>
-
-      {message && (
-        <div
-          className={`p-3 rounded-md ${
-            message.type === 'success'
-              ? 'bg-green-900/50 border border-green-700 text-green-200'
-              : 'bg-red-900/50 border border-red-700 text-red-200'
-          }`}
-        >
-          <p className="text-sm">{message.text}</p>
-        </div>
-      )}
-
+      {/* Formulário de adicionar/editar */}
       {isAdding && (
-        <Card title={editingId ? 'Editar Liga' : 'Nova Liga'} className="border border-blue-500/30">
+        <Card title={editingId ? 'Editar Liga' : 'Adicionar Nova Liga'} className="border border-blue-500/30">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -167,80 +122,77 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ currentMatch, onLeagueSe
               </label>
               <input
                 type="text"
-                value={formData.name}
+                value={formData.name || ''}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ex: Brasileirão Série A, Premier League, etc."
+                placeholder="Ex: Brasileirão Série A"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                URL da Competição (opcional)
+                URL da Página de Competição
               </label>
               <input
                 type="text"
-                value={formData.competitionUrl}
+                value={formData.competitionUrl || ''}
                 onChange={(e) => setFormData({ ...formData, competitionUrl: e.target.value })}
                 placeholder="https://www.academiadasapostasbrasil.com/stats/competition/..."
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-gray-400 text-xs mt-1">
-                URL da página de estatísticas da competição para buscar dados automaticamente
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  País (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.country}
-                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  placeholder="Ex: Brasil, Inglaterra, etc."
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Temporada (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.season}
-                  onChange={(e) => setFormData({ ...formData, season: e.target.value })}
-                  placeholder="Ex: 2024, 2024/2025, etc."
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Observações (opcional)
+                URL de Estatísticas (opcional)
               </label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Notas adicionais sobre a liga..."
-                rows={3}
+              <input
+                type="text"
+                value={formData.statsUrl || ''}
+                onChange={(e) => setFormData({ ...formData, statsUrl: e.target.value })}
+                placeholder="https://www.academiadasapostasbrasil.com/stats/competition/.../statistics"
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  País
+                </label>
+                <input
+                  type="text"
+                  value={formData.country || ''}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  placeholder="Ex: Brasil"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Temporada
+                </label>
+                <input
+                  type="text"
+                  value={formData.season || ''}
+                  onChange={(e) => setFormData({ ...formData, season: e.target.value })}
+                  placeholder="Ex: 2024"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition-colors"
               >
-                {editingId ? 'Atualizar' : 'Salvar'}
+                {editingId ? 'Salvar Alterações' : 'Adicionar Liga'}
               </button>
               <button
-                onClick={resetForm}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm font-medium transition-colors"
+                onClick={handleCancel}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md font-medium transition-colors"
               >
                 Cancelar
               </button>
@@ -249,125 +201,89 @@ export const LeaguesTab: React.FC<LeaguesTabProps> = ({ currentMatch, onLeagueSe
         </Card>
       )}
 
-      {currentMatch && (
-        <Card title="Sincronização com Partida Atual" className="border border-purple-500/30">
-          <div className="space-y-2">
-            <p className="text-gray-300 text-sm">
-              <strong>Partida:</strong> {currentMatch.teamA.name} vs {currentMatch.teamB.name}
-            </p>
-            <p className="text-gray-300 text-sm">
-              <strong>Competição:</strong> {currentMatch.matchInfo.competition}
-            </p>
-            {selectedLeagueId && (
-              <div className="mt-3 p-3 bg-green-900/30 border border-green-700 rounded-md">
-                <p className="text-green-200 text-sm">
-                  ✓ Liga sincronizada: {leagues.find(l => l.id === selectedLeagueId)?.name}
-                </p>
-              </div>
-            )}
+      {/* Liga sugerida baseada na competição atual */}
+      {!isAdding && suggestedLeague && (
+        <Card title="Liga Sugerida" className="border border-green-500/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-white">{suggestedLeague.name}</h3>
+              {suggestedLeague.competitionUrl && (
+                <p className="text-sm text-gray-400 mt-1">URL: {suggestedLeague.competitionUrl}</p>
+              )}
+            </div>
+            <button
+              onClick={() => handleUseLeague(suggestedLeague)}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition-colors"
+            >
+              Usar Esta Liga
+            </button>
           </div>
         </Card>
       )}
 
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-white">Ligas Cadastradas ({leagues.length})</h3>
-        
+      {/* Lista de ligas */}
+      <Card title="Ligas Cadastradas" className="border border-gray-700">
         {leagues.length === 0 ? (
-          <Card className="border border-gray-700">
-            <p className="text-gray-400 text-center py-4">
-              Nenhuma liga cadastrada. Clique em "Adicionar Liga" para começar.
-            </p>
-          </Card>
+          <p className="text-gray-400 text-center py-8">
+            Nenhuma liga cadastrada. Clique em "Adicionar Liga" para começar.
+          </p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {leagues.map(league => (
-              <Card 
-                key={league.id} 
-                className={`border ${
-                  selectedLeagueId === league.id 
-                    ? 'border-green-500 bg-green-900/10' 
-                    : 'border-gray-700'
-                }`}
+          <div className="space-y-3">
+            {leagues.map((league) => (
+              <div
+                key={league.id}
+                className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors"
               >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between">
-                    <h4 className="text-lg font-semibold text-white">{league.name}</h4>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleEdit(league)}
-                        className="p-1 text-blue-400 hover:text-blue-300"
-                        title="Editar"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleDelete(league.id)}
-                        className="p-1 text-red-400 hover:text-red-300"
-                        title="Excluir"
-                      >
-                        🗑️
-                      </button>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-white">{league.name}</h3>
+                    <div className="mt-2 space-y-1 text-sm text-gray-400">
+                      {league.country && <p>País: {league.country}</p>}
+                      {league.season && <p>Temporada: {league.season}</p>}
+                      {league.competitionUrl && (
+                        <p className="text-xs break-all">URL: {league.competitionUrl}</p>
+                      )}
                     </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Criada em: {new Date(league.createdAt).toLocaleDateString('pt-BR')}
+                    </p>
                   </div>
-
-                  {league.country && (
-                    <p className="text-sm text-gray-400">
-                      <strong>País:</strong> {league.country}
-                    </p>
-                  )}
-
-                  {league.season && (
-                    <p className="text-sm text-gray-400">
-                      <strong>Temporada:</strong> {league.season}
-                    </p>
-                  )}
-
-                  {league.competitionUrl && (
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">URL da Competição:</p>
-                      <a
-                        href={league.competitionUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:text-blue-300 break-all"
-                      >
-                        {league.competitionUrl.substring(0, 50)}...
-                      </a>
-                    </div>
-                  )}
-
-                  {league.notes && (
-                    <p className="text-sm text-gray-400 italic">
-                      {league.notes}
-                    </p>
-                  )}
-
-                  <div className="flex gap-2 pt-2 border-t border-gray-700">
-                    {currentMatch && (
-                      <button
-                        onClick={() => handleSyncWithMatch(league)}
-                        className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium transition-colors"
-                      >
-                        Sincronizar
-                      </button>
-                    )}
+                  <div className="flex gap-2 ml-4">
                     <button
-                      onClick={() => handleSelect(league)}
-                      className={`flex-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                        selectedLeagueId === league.id
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-600 hover:bg-gray-700 text-white'
-                      }`}
+                      onClick={() => handleUseLeague(league)}
+                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors"
+                      title="Usar esta liga para preencher dados da partida"
                     >
-                      {selectedLeagueId === league.id ? 'Selecionada' : 'Selecionar'}
+                      Usar
+                    </button>
+                    <button
+                      onClick={() => handleEdit(league)}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDelete(league.id)}
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors"
+                    >
+                      Excluir
                     </button>
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         )}
-      </div>
+
+        {!isAdding && (
+          <button
+            onClick={() => setIsAdding(true)}
+            className="mt-4 w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md font-medium transition-colors"
+          >
+            + Adicionar Nova Liga
+          </button>
+        )}
+      </Card>
     </div>
   );
 };

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { updateMatchDetailsFromHTML, uploadMatchDetailsFile, applyMatchDetailsUpdate, scrapeMatchDetailsFromURL, type MatchDetailsResponse } from '../services/matchDetailsService';
-import { findLeagueForCompetition } from '../services/leagueService';
 import type { MatchDetails } from '../types';
 
 interface UpdateMatchDetailsProps {
@@ -15,15 +14,24 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
   const [competitionUrl, setCompetitionUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Busca liga cadastrada para a competição da partida
+  // Escuta eventos de seleção de liga
   useEffect(() => {
-    if (match.matchInfo.competition) {
-      const league = findLeagueForCompetition(match.matchInfo.competition);
+    const handleLeagueSelected = (event: CustomEvent) => {
+      const league = event.detail;
       if (league && league.competitionUrl) {
         setCompetitionUrl(league.competitionUrl);
+        setMessage({ 
+          type: 'success', 
+          text: `URL da competição preenchida automaticamente: ${league.name}` 
+        });
       }
-    }
-  }, [match.matchInfo.competition]);
+    };
+
+    window.addEventListener('league-selected', handleLeagueSelected as EventListener);
+    return () => {
+      window.removeEventListener('league-selected', handleLeagueSelected as EventListener);
+    };
+  }, []);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -165,7 +173,7 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
   return (
     <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Importar Detalhes da Partida</h2>
+        <h2 className="text-lg font-semibold text-white">Atualizar Detalhes da Partida</h2>
       </div>
 
       {/* Campo de URL */}
@@ -202,35 +210,16 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
         <label className="block text-sm font-medium text-gray-300 mb-2">
           URL da página de competição/liga (opcional - para buscar estatísticas):
         </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={competitionUrl}
-            onChange={(e) => setCompetitionUrl(e.target.value)}
-            placeholder="https://www.academiadasapostasbrasil.com/stats/competition/..."
-            disabled={isUpdating}
-            className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-600 disabled:cursor-not-allowed"
-          />
-          <button
-            onClick={() => {
-              const league = findLeagueForCompetition(match.matchInfo.competition);
-              if (league && league.competitionUrl) {
-                setCompetitionUrl(league.competitionUrl);
-                setMessage({ type: 'success', text: `URL da liga "${league.name}" preenchida automaticamente!` });
-              } else {
-                setMessage({ type: 'error', text: 'Nenhuma liga cadastrada para esta competição. Cadastre uma liga na aba "Ligas".' });
-              }
-            }}
-            disabled={isUpdating}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors whitespace-nowrap"
-            title="Buscar URL da liga cadastrada"
-          >
-            🔗 Usar Liga
-          </button>
-        </div>
+        <input
+          type="text"
+          value={competitionUrl}
+          onChange={(e) => setCompetitionUrl(e.target.value)}
+          placeholder="https://www.academiadasapostasbrasil.com/stats/competition/..."
+          disabled={isUpdating}
+          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-600 disabled:cursor-not-allowed"
+        />
         <p className="text-gray-400 text-xs mt-1">
-          Se os dados de gols não forem encontrados na página de detalhes, o sistema buscará automaticamente na página de competição. 
-          Use o botão "Usar Liga" para preencher automaticamente se você cadastrou a liga na aba "Ligas".
+          Se os dados de gols não forem encontrados na página de detalhes, o sistema buscará automaticamente na página de competição.
         </p>
       </div>
 

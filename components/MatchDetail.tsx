@@ -7,11 +7,12 @@ import { StandingsTab } from './StandingsTab';
 import { GoalAnalysisTab } from './GoalAnalysisTab';
 import { GeminiAnalysis } from './GeminiAnalysis';
 import { ProbabilityAnalysisTab } from './ProbabilityAnalysisTab';
-import { LeaguesTab } from './LeaguesTab';
 import { UpdateMatchDetails } from './UpdateMatchDetails';
 import { UpdateLiveStatus } from './UpdateLiveStatus';
+import { LeaguesTab } from './LeaguesTab';
 import { scrapeMatchDetailsFromURL, applyMatchDetailsUpdate } from '../services/matchDetailsService';
 import type { MatchDetails, Tab, LiveMatchStatus, MatchOdds } from '../types';
+import type { League } from '../types/league';
 
 interface MatchDetailProps {
   match: MatchDetails;
@@ -36,6 +37,14 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
       liveStatus: liveStatus || prev.liveStatus,
       odds: odds || prev.odds
     }));
+  };
+
+  const handleLeagueSelected = (league: League) => {
+    // Quando uma liga é selecionada, atualiza o componente UpdateMatchDetails
+    // Isso será feito via ref ou state compartilhado
+    console.log('Liga selecionada:', league);
+    // Dispara evento customizado para o UpdateMatchDetails
+    window.dispatchEvent(new CustomEvent('league-selected', { detail: league }));
   };
 
   // Scraping automático dos detalhes quando a página carrega (se tiver URL)
@@ -111,33 +120,8 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
                 />;
       case 'Ligas':
         return <LeaguesTab 
-                    currentMatch={currentMatch}
-                    onLeagueSelected={async (league) => {
-                      // Quando uma liga é selecionada, usa a URL da competição para buscar dados
-                      if (league.competitionUrl && currentMatch.matchInfo.url) {
-                        setMessage({ type: 'success', text: `Liga "${league.name}" selecionada. Buscando dados da competição...` });
-                        
-                        try {
-                          // Busca detalhes usando a URL da partida e a URL da competição
-                          const result = await scrapeMatchDetailsFromURL(
-                            currentMatch.matchInfo.url,
-                            currentMatch.id,
-                            league.competitionUrl
-                          );
-                          
-                          if (result.success && result.data) {
-                            const updatedMatch = applyMatchDetailsUpdate(currentMatch, result.data);
-                            setCurrentMatch(updatedMatch);
-                            setMessage({ type: 'success', text: `Dados da liga "${league.name}" sincronizados com sucesso!` });
-                          }
-                        } catch (error) {
-                          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-                          setMessage({ type: 'error', text: `Erro ao sincronizar: ${errorMessage}` });
-                        }
-                      } else {
-                        setMessage({ type: 'success', text: `Liga "${league.name}" selecionada. Adicione a URL da competição para buscar dados automaticamente.` });
-                      }
-                    }}
+                    match={currentMatch}
+                    onLeagueSelected={handleLeagueSelected}
                 />;
       default:
         return <OverviewTab 
@@ -182,19 +166,6 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
             </p>
           </div>
         )}
-        
-        {message && (
-          <div
-            className={`mb-4 p-3 rounded-md ${
-              message.type === 'success'
-                ? 'bg-green-900/50 border border-green-700 text-green-200'
-                : 'bg-red-900/50 border border-red-700 text-red-200'
-            }`}
-          >
-            <p className="text-sm">{message.text}</p>
-          </div>
-        )}
-        
         <UpdateMatchDetails match={currentMatch} onDetailsUpdated={handleDetailsUpdated} />
         <UpdateLiveStatus match={currentMatch} onStatusUpdated={handleLiveStatusUpdated} />
         <MatchHeader 

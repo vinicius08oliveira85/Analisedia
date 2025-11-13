@@ -1,15 +1,17 @@
-import type { League } from '../types';
+import type { League, LeagueStorage } from '../types/league';
 
 const STORAGE_KEY = 'futibou_leagues';
 
 /**
- * Obtém todas as ligas salvas
+ * Carrega todas as ligas do localStorage
  */
-export function getLeagues(): League[] {
+export function loadLeagues(): League[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
-    return JSON.parse(stored);
+    
+    const data: LeagueStorage = JSON.parse(stored);
+    return data.leagues || [];
   } catch (error) {
     console.error('Erro ao carregar ligas:', error);
     return [];
@@ -17,67 +19,91 @@ export function getLeagues(): League[] {
 }
 
 /**
- * Salva uma liga (cria ou atualiza)
+ * Salva ligas no localStorage
  */
-export function saveLeague(league: League): void {
+export function saveLeagues(leagues: League[]): void {
   try {
-    const leagues = getLeagues();
-    const index = leagues.findIndex(l => l.id === league.id);
-    
-    if (index >= 0) {
-      leagues[index] = league;
-    } else {
-      leagues.push(league);
-    }
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(leagues));
+    const data: LeagueStorage = { leagues };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
-    console.error('Erro ao salvar liga:', error);
-    throw new Error('Erro ao salvar liga');
+    console.error('Erro ao salvar ligas:', error);
+    throw new Error('Erro ao salvar ligas');
   }
+}
+
+/**
+ * Adiciona uma nova liga
+ */
+export function addLeague(league: Omit<League, 'id' | 'createdAt' | 'updatedAt'>): League {
+  const leagues = loadLeagues();
+  const newLeague: League = {
+    ...league,
+    id: `league_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  
+  leagues.push(newLeague);
+  saveLeagues(leagues);
+  return newLeague;
+}
+
+/**
+ * Atualiza uma liga existente
+ */
+export function updateLeague(id: string, updates: Partial<Omit<League, 'id' | 'createdAt'>>): League | null {
+  const leagues = loadLeagues();
+  const index = leagues.findIndex(l => l.id === id);
+  
+  if (index === -1) return null;
+  
+  leagues[index] = {
+    ...leagues[index],
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+  
+  saveLeagues(leagues);
+  return leagues[index];
 }
 
 /**
  * Remove uma liga
  */
-export function deleteLeague(id: string): void {
-  try {
-    const leagues = getLeagues();
-    const filtered = leagues.filter(l => l.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  } catch (error) {
-    console.error('Erro ao excluir liga:', error);
-    throw new Error('Erro ao excluir liga');
-  }
-}
-
-/**
- * Busca uma liga por ID
- */
-export function getLeagueById(id: string): League | null {
-  const leagues = getLeagues();
-  return leagues.find(l => l.id === id) || null;
+export function deleteLeague(id: string): boolean {
+  const leagues = loadLeagues();
+  const filtered = leagues.filter(l => l.id !== id);
+  
+  if (filtered.length === leagues.length) return false;
+  
+  saveLeagues(filtered);
+  return true;
 }
 
 /**
  * Busca uma liga por nome (busca flexível)
  */
 export function findLeagueByName(name: string): League | null {
-  const leagues = getLeagues();
+  const leagues = loadLeagues();
   const normalizedName = name.toLowerCase().trim();
   
-  return leagues.find(league => {
-    const leagueName = league.name.toLowerCase().trim();
-    return leagueName === normalizedName || 
-           leagueName.includes(normalizedName) || 
-           normalizedName.includes(leagueName);
-  }) || null;
+  return leagues.find(l => 
+    l.name.toLowerCase().trim() === normalizedName ||
+    l.name.toLowerCase().includes(normalizedName) ||
+    normalizedName.includes(l.name.toLowerCase())
+  ) || null;
 }
 
 /**
- * Busca liga por competição de uma partida
+ * Busca ligas que correspondem a uma competição
  */
-export function findLeagueForCompetition(competitionName: string): League | null {
-  return findLeagueByName(competitionName);
+export function findLeaguesByCompetition(competitionName: string): League[] {
+  const leagues = loadLeagues();
+  const normalizedName = competitionName.toLowerCase().trim();
+  
+  return leagues.filter(l => 
+    l.name.toLowerCase().includes(normalizedName) ||
+    normalizedName.includes(l.name.toLowerCase())
+  );
 }
 
