@@ -2160,38 +2160,90 @@ export default async function handler(
         console.error(`[Goal Stats] Tabelas disponíveis: ${allGoalStatsTables.map(t => `"${t.teamName}"`).join(', ')}`);
       }
       
-      // NOVA ABORDAGEM: Usa busca direta como método PRINCIPAL (mais confiável)
-      console.log(`[Goal Stats] ===== Extraindo stats usando busca direta no HTML =====`);
+      // NOVA ABORDAGEM: Tenta múltiplas fontes de dados
+      console.log(`[Goal Stats] ===== Extraindo stats usando múltiplas estratégias =====`);
       
-      // Time A - busca direta
-      console.log(`[Goal Stats] Extraindo stats do Time A (${matchInfo.teamA})...`);
+      // ESTRATÉGIA 1: Busca direta no HTML (método principal)
+      console.log(`[Goal Stats] ESTRATÉGIA 1: Busca direta no HTML...`);
       let teamAGoalStatsHome = extractGoalStatsDirectly(html, matchInfo.teamA, 'home');
       let teamAGoalStatsAway = extractGoalStatsDirectly(html, matchInfo.teamA, 'away');
       let teamAGoalStatsGlobal = extractGoalStatsDirectly(html, matchInfo.teamA, 'global');
       
-      // Se busca direta não encontrou, tenta tabelas como fallback
-      if (teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0 && teamATable) {
-        console.log(`[Goal Stats] Time A: Busca direta falhou, tentando tabela...`);
-        const tableStats = extractGoalStatsFromTable(teamATable.tableHtml, 'home');
-        if (tableStats.avgGoalsScored > 0 || tableStats.avgGoalsConceded > 0) {
-          teamAGoalStatsHome = tableStats;
-          console.log(`[Goal Stats] Time A: Usando dados da tabela!`);
-        }
-      }
-      
-      // Time B - busca direta
-      console.log(`[Goal Stats] Extraindo stats do Time B (${matchInfo.teamB})...`);
       let teamBGoalStatsHome = extractGoalStatsDirectly(html, matchInfo.teamB, 'home');
       let teamBGoalStatsAway = extractGoalStatsDirectly(html, matchInfo.teamB, 'away');
       let teamBGoalStatsGlobal = extractGoalStatsDirectly(html, matchInfo.teamB, 'global');
       
-      // Se busca direta não encontrou, tenta tabelas como fallback
-      if (teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0 && teamBTable) {
-        console.log(`[Goal Stats] Time B: Busca direta falhou, tentando tabela...`);
-        const tableStats = extractGoalStatsFromTable(teamBTable.tableHtml, 'home');
-        if (tableStats.avgGoalsScored > 0 || tableStats.avgGoalsConceded > 0) {
-          teamBGoalStatsHome = tableStats;
-          console.log(`[Goal Stats] Time B: Usando dados da tabela!`);
+      // ESTRATÉGIA 2: Se busca direta falhou, tenta tabelas
+      if ((teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0) || 
+          (teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0)) {
+        console.log(`[Goal Stats] ESTRATÉGIA 2: Busca direta falhou parcialmente, tentando tabelas...`);
+        
+        if (teamATable && teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0) {
+          const tableStats = extractGoalStatsFromTable(teamATable.tableHtml, 'home');
+          if (tableStats.avgGoalsScored > 0 || tableStats.avgGoalsConceded > 0) {
+            teamAGoalStatsHome = tableStats;
+            console.log(`[Goal Stats] Time A: Usando dados da tabela!`);
+          }
+        }
+        
+        if (teamBTable && teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0) {
+          const tableStats = extractGoalStatsFromTable(teamBTable.tableHtml, 'home');
+          if (tableStats.avgGoalsScored > 0 || tableStats.avgGoalsConceded > 0) {
+            teamBGoalStatsHome = tableStats;
+            console.log(`[Goal Stats] Time B: Usando dados da tabela!`);
+          }
+        }
+      }
+      
+      // ESTRATÉGIA 3: Se ainda não encontrou, tenta extrair dos últimos 10 jogos (calcular média)
+      if ((teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0) || 
+          (teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0)) {
+        console.log(`[Goal Stats] ESTRATÉGIA 3: Calculando médias dos últimos jogos...`);
+        
+        // Extrai últimos jogos do time A
+        const teamAForm = extractLast10Matches(html, matchInfo.teamA);
+        if (teamAForm.length > 0 && teamAGoalStatsHome.avgGoalsScored === 0) {
+          const homeMatches = teamAForm.filter(m => m.homeTeam === matchInfo.teamA);
+          const awayMatches = teamAForm.filter(m => m.awayTeam === matchInfo.teamA);
+          
+          if (homeMatches.length > 0) {
+            const totalScored = homeMatches.reduce((sum, m) => sum + (parseInt(m.score?.split('-')[0] || '0') || 0), 0);
+            const totalConceded = homeMatches.reduce((sum, m) => sum + (parseInt(m.score?.split('-')[1] || '0') || 0), 0);
+            teamAGoalStatsHome.avgGoalsScored = totalScored / homeMatches.length;
+            teamAGoalStatsHome.avgGoalsConceded = totalConceded / homeMatches.length;
+            console.log(`[Goal Stats] Time A: Calculado dos últimos jogos (casa): Marcados=${teamAGoalStatsHome.avgGoalsScored.toFixed(2)}, Sofridos=${teamAGoalStatsHome.avgGoalsConceded.toFixed(2)}`);
+          }
+          
+          if (awayMatches.length > 0) {
+            const totalScored = awayMatches.reduce((sum, m) => sum + (parseInt(m.score?.split('-')[1] || '0') || 0), 0);
+            const totalConceded = awayMatches.reduce((sum, m) => sum + (parseInt(m.score?.split('-')[0] || '0') || 0), 0);
+            teamAGoalStatsAway.avgGoalsScored = totalScored / awayMatches.length;
+            teamAGoalStatsAway.avgGoalsConceded = totalConceded / awayMatches.length;
+            console.log(`[Goal Stats] Time A: Calculado dos últimos jogos (fora): Marcados=${teamAGoalStatsAway.avgGoalsScored.toFixed(2)}, Sofridos=${teamAGoalStatsAway.avgGoalsConceded.toFixed(2)}`);
+          }
+        }
+        
+        // Extrai últimos jogos do time B
+        const teamBForm = extractLast10Matches(html, matchInfo.teamB);
+        if (teamBForm.length > 0 && teamBGoalStatsHome.avgGoalsScored === 0) {
+          const homeMatches = teamBForm.filter(m => m.homeTeam === matchInfo.teamB);
+          const awayMatches = teamBForm.filter(m => m.awayTeam === matchInfo.teamB);
+          
+          if (homeMatches.length > 0) {
+            const totalScored = homeMatches.reduce((sum, m) => sum + (parseInt(m.score?.split('-')[0] || '0') || 0), 0);
+            const totalConceded = homeMatches.reduce((sum, m) => sum + (parseInt(m.score?.split('-')[1] || '0') || 0), 0);
+            teamBGoalStatsHome.avgGoalsScored = totalScored / homeMatches.length;
+            teamBGoalStatsHome.avgGoalsConceded = totalConceded / homeMatches.length;
+            console.log(`[Goal Stats] Time B: Calculado dos últimos jogos (casa): Marcados=${teamBGoalStatsHome.avgGoalsScored.toFixed(2)}, Sofridos=${teamBGoalStatsHome.avgGoalsConceded.toFixed(2)}`);
+          }
+          
+          if (awayMatches.length > 0) {
+            const totalScored = awayMatches.reduce((sum, m) => sum + (parseInt(m.score?.split('-')[1] || '0') || 0), 0);
+            const totalConceded = awayMatches.reduce((sum, m) => sum + (parseInt(m.score?.split('-')[0] || '0') || 0), 0);
+            teamBGoalStatsAway.avgGoalsScored = totalScored / awayMatches.length;
+            teamBGoalStatsAway.avgGoalsConceded = totalConceded / awayMatches.length;
+            console.log(`[Goal Stats] Time B: Calculado dos últimos jogos (fora): Marcados=${teamBGoalStatsAway.avgGoalsScored.toFixed(2)}, Sofridos=${teamBGoalStatsAway.avgGoalsConceded.toFixed(2)}`);
+          }
         }
       }
       
