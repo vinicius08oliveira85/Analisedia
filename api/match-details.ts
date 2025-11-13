@@ -1221,8 +1221,9 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
   
   const sectionHtml = sectionMatch[0];
   
-  // Busca todas as tabelas stat-last10 com seus subtitles (igual ao Form)
-  const tableRegex = /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
+  // Busca todas as tabelas stat-last10 OU stat-seqs com seus subtitles (igual ao Form)
+  // A classe pode ser stat-last10, stat-seqs, ou stat-seqs stat-half-padding
+  const tableRegex = /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*(?:stat-last10|stat-seqs)[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
   
   let match;
   const goalStatsTables: Array<{ teamName: string; tableHtml: string }> = [];
@@ -1232,7 +1233,12 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
     const tableHtml = match[2];
     
     // Verifica se é uma tabela de estatísticas de gols (tem "Média de gols", "> 2,5", etc)
-    if (tableHtml.includes('Média de gols') || tableHtml.includes('> 2,5') || tableHtml.includes('< 2,5') || tableHtml.includes('Jogos sem')) {
+    if (tableHtml.includes('Média de gols') || 
+        tableHtml.includes('> 2,5') || 
+        tableHtml.includes('< 2,5') || 
+        tableHtml.includes('Jogos sem') ||
+        tableHtml.includes('Média de gols marcados') ||
+        tableHtml.includes('Média de gols sofridos')) {
       goalStatsTables.push({ teamName: foundTeamName, tableHtml });
       console.log(`[extractGoalStats] Tabela de goal stats encontrada para: ${foundTeamName}`);
     }
@@ -1622,49 +1628,30 @@ export default async function handler(
       console.log('=== Extraindo Estatísticas de Gols ===');
       console.log(`Extraindo goal stats para ${matchInfo.teamA} e ${matchInfo.teamB}`);
       
-      // Primeiro, busca todas as tabelas stat-last10 e identifica qual é de qual time
-      const allGoalTables = html.matchAll(/<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-last10[^"]*"[^>]*>([\s\S]*?)<\/table>/gi);
-      const goalTablesByTeam: Array<{ teamName: string; tableHtml: string }> = [];
-      
-      for (const match of allGoalTables) {
-        const foundTeamName = match[1].trim();
-        const tableHtml = match[2];
-        // Verifica se a tabela contém estatísticas de gols (não apenas form)
-        if (tableHtml.includes('Média de gols') || tableHtml.includes('> 2,5') || tableHtml.includes('Jogos sem')) {
-          goalTablesByTeam.push({ teamName: foundTeamName, tableHtml });
-          console.log(`  Tabela de goal stats encontrada para: ${foundTeamName}`);
-        }
-      }
-      
-      // Encontra tabelas específicas de cada time
-      const teamATable = goalTablesByTeam.find(t => {
-        const foundNormalized = normalizeTeamName(t.teamName);
-        const teamANormalized = normalizeTeamName(matchInfo.teamA);
-        return foundNormalized === teamANormalized || 
-               foundNormalized.includes(teamANormalized) ||
-               teamANormalized.includes(foundNormalized);
-      });
-      
-      const teamBTable = goalTablesByTeam.find(t => {
-        const foundNormalized = normalizeTeamName(t.teamName);
-        const teamBNormalized = normalizeTeamName(matchInfo.teamB);
-        return foundNormalized === teamBNormalized || 
-               foundNormalized.includes(teamBNormalized) ||
-               teamBNormalized.includes(foundNormalized);
-      });
-      
-      // Extrai goal stats usando as tabelas encontradas
+      // Usa a função extractGoalStats que já busca tanto stat-last10 quanto stat-seqs
       const teamAGoalStats = {
-        home: teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'home') : extractGoalStats(html, matchInfo.teamA, 'home'),
-        away: teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'away') : extractGoalStats(html, matchInfo.teamA, 'away'),
-        global: teamATable ? extractGoalStatsFromTable(teamATable.tableHtml, 'global') : extractGoalStats(html, matchInfo.teamA, 'global')
+        home: extractGoalStats(html, matchInfo.teamA, 'home'),
+        away: extractGoalStats(html, matchInfo.teamA, 'away'),
+        global: extractGoalStats(html, matchInfo.teamA, 'global')
       };
       
       const teamBGoalStats = {
-        home: teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'home') : extractGoalStats(html, matchInfo.teamB, 'home'),
-        away: teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'away') : extractGoalStats(html, matchInfo.teamB, 'away'),
-        global: teamBTable ? extractGoalStatsFromTable(teamBTable.tableHtml, 'global') : extractGoalStats(html, matchInfo.teamB, 'global')
+        home: extractGoalStats(html, matchInfo.teamB, 'home'),
+        away: extractGoalStats(html, matchInfo.teamB, 'away'),
+        global: extractGoalStats(html, matchInfo.teamB, 'global')
       };
+      
+      console.log(`[Goal Stats] Time A (${matchInfo.teamA}):`, {
+        home: `Marcados=${teamAGoalStats.home.avgGoalsScored}, Sofridos=${teamAGoalStats.home.avgGoalsConceded}`,
+        away: `Marcados=${teamAGoalStats.away.avgGoalsScored}, Sofridos=${teamAGoalStats.away.avgGoalsConceded}`,
+        global: `Marcados=${teamAGoalStats.global.avgGoalsScored}, Sofridos=${teamAGoalStats.global.avgGoalsConceded}`
+      });
+      
+      console.log(`[Goal Stats] Time B (${matchInfo.teamB}):`, {
+        home: `Marcados=${teamBGoalStats.home.avgGoalsScored}, Sofridos=${teamBGoalStats.home.avgGoalsConceded}`,
+        away: `Marcados=${teamBGoalStats.away.avgGoalsScored}, Sofridos=${teamBGoalStats.away.avgGoalsConceded}`,
+        global: `Marcados=${teamBGoalStats.global.avgGoalsScored}, Sofridos=${teamBGoalStats.global.avgGoalsConceded}`
+      });
       
       console.log(`Goal Stats extraídos: ${matchInfo.teamA} (Casa: ${teamAGoalStats.home.avgGoalsScored}, Fora: ${teamAGoalStats.away.avgGoalsScored}) e ${matchInfo.teamB} (Casa: ${teamBGoalStats.home.avgGoalsScored}, Fora: ${teamBGoalStats.away.avgGoalsScored})`);
 

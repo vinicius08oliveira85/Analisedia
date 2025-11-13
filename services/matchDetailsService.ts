@@ -171,6 +171,32 @@ export function applyMatchDetailsUpdate(
     teamBAnalysisCount: update.teamBOpponentAnalysis.away.length + update.teamBOpponentAnalysis.global.length
   });
 
+  // Verifica se goal stats têm dados válidos (não todos zerados)
+  const hasTeamAGoalStats = update.teamAGoalStats && (
+    update.teamAGoalStats.home.avgGoalsScored > 0 || 
+    update.teamAGoalStats.home.avgGoalsConceded > 0 ||
+    update.teamAGoalStats.away.avgGoalsScored > 0 ||
+    update.teamAGoalStats.away.avgGoalsConceded > 0 ||
+    update.teamAGoalStats.global.avgGoalsScored > 0 ||
+    update.teamAGoalStats.global.avgGoalsConceded > 0
+  );
+  
+  const hasTeamBGoalStats = update.teamBGoalStats && (
+    update.teamBGoalStats.home.avgGoalsScored > 0 || 
+    update.teamBGoalStats.home.avgGoalsConceded > 0 ||
+    update.teamBGoalStats.away.avgGoalsScored > 0 ||
+    update.teamBGoalStats.away.avgGoalsConceded > 0 ||
+    update.teamBGoalStats.global.avgGoalsScored > 0 ||
+    update.teamBGoalStats.global.avgGoalsConceded > 0
+  );
+
+  console.log('Aplicando goal stats:', {
+    hasTeamAGoalStats,
+    hasTeamBGoalStats,
+    teamAHome: update.teamAGoalStats?.home.avgGoalsScored,
+    teamBHome: update.teamBGoalStats?.home.avgGoalsScored
+  });
+
   return {
     ...currentMatch,
     teamAForm: update.teamAForm.length > 0 ? update.teamAForm : currentMatch.teamAForm,
@@ -181,8 +207,8 @@ export function applyMatchDetailsUpdate(
     teamBStreaks: update.teamBStreaks,
     teamAOpponentAnalysis: update.teamAOpponentAnalysis,
     teamBOpponentAnalysis: update.teamBOpponentAnalysis,
-    teamAGoalStats: update.teamAGoalStats || currentMatch.teamAGoalStats,
-    teamBGoalStats: update.teamBGoalStats || currentMatch.teamBGoalStats,
+    teamAGoalStats: hasTeamAGoalStats ? update.teamAGoalStats : currentMatch.teamAGoalStats,
+    teamBGoalStats: hasTeamBGoalStats ? update.teamBGoalStats : currentMatch.teamBGoalStats,
   };
 }
 
