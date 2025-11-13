@@ -1835,14 +1835,15 @@ export default async function handler(
         sectionHtml = html;
       }
       
-      // Busca todas as tabelas
+      // Busca todas as tabelas - MÚLTIPLAS ESTRATÉGIAS
+      const allGoalStatsTables: Array<{ teamName: string; tableHtml: string; index: number }> = [];
+      let tableIndex = 0;
+      
+      // ESTRATÉGIA 1: Busca com stats-subtitle (padrão)
       const tablePatterns = [
         /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*(?:stat-last10|stat-seqs)[^"]*"[^>]*>([\s\S]*?)<\/table>/gi,
         /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/gi,
       ];
-      
-      const allGoalStatsTables: Array<{ teamName: string; tableHtml: string; index: number }> = [];
-      let tableIndex = 0;
       
       for (const tableRegex of tablePatterns) {
         let match;
@@ -1863,6 +1864,71 @@ export default async function handler(
             const exists = allGoalStatsTables.some(t => t.teamName === foundTeamName && t.tableHtml === tableHtml);
             if (!exists) {
               allGoalStatsTables.push({ teamName: foundTeamName, tableHtml, index: tableIndex++ });
+              console.log(`[Goal Stats] ESTRATÉGIA 1: Tabela ${tableIndex} encontrada: "${foundTeamName}"`);
+            }
+          }
+        }
+      }
+      
+      // ESTRATÉGIA 2: Busca TODAS as tabelas stat-last10 ou stat-seqs e verifica se são goal stats
+      if (allGoalStatsTables.length < 2) {
+        console.log(`[Goal Stats] ESTRATÉGIA 2: Buscando tabelas sem stats-subtitle (encontradas: ${allGoalStatsTables.length})`);
+        const allTablesRegex = /<table[^>]*class="[^"]*(?:stat-last10|stat-seqs)[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
+        let tableMatch;
+        let foundCount = 0;
+        
+        while ((tableMatch = allTablesRegex.exec(sectionHtml)) !== null) {
+          const tableHtml = tableMatch[1];
+          
+          const isGoalStatsTable = 
+            tableHtml.includes('Média de gols') || 
+            tableHtml.includes('> 2,5') || 
+            tableHtml.includes('< 2,5') || 
+            tableHtml.includes('Jogos sem') ||
+            tableHtml.includes('Média de gols marcados') ||
+            tableHtml.includes('Média de gols sofridos') ||
+            (tableHtml.includes('média') && (tableHtml.includes('gols') || tableHtml.includes('gol')));
+          
+          if (isGoalStatsTable) {
+            foundCount++;
+            // Tenta encontrar o nome do time ANTES da tabela (busca reversa)
+            const beforeTable = sectionHtml.substring(0, tableMatch.index);
+            const teamNameMatch = beforeTable.match(/<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>/i);
+            const foundTeamName = teamNameMatch ? teamNameMatch[1].trim() : `Time ${foundCount}`;
+            
+            const exists = allGoalStatsTables.some(t => t.tableHtml === tableHtml);
+            if (!exists) {
+              allGoalStatsTables.push({ teamName: foundTeamName, tableHtml, index: tableIndex++ });
+              console.log(`[Goal Stats] ESTRATÉGIA 2: Tabela ${tableIndex} encontrada: "${foundTeamName}"`);
+            }
+          }
+        }
+      }
+      
+      // ESTRATÉGIA 3: Se ainda não encontrou 2 tabelas, busca por contexto (próximo ao nome do time)
+      if (allGoalStatsTables.length < 2) {
+        console.log(`[Goal Stats] ESTRATÉGIA 3: Buscando por contexto dos times (encontradas: ${allGoalStatsTables.length})`);
+        
+        // Busca tabelas próximas aos nomes dos times
+        for (const teamName of [teamAActualName, teamBActualName]) {
+          const escapedName = teamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const contextRegex = new RegExp(`${escapedName}[\\s\\S]{0,500}<table[^>]*>([\\s\\S]*?)<\\/table>`, 'i');
+          const contextMatch = sectionHtml.match(contextRegex);
+          
+          if (contextMatch) {
+            const tableHtml = contextMatch[1];
+            const isGoalStatsTable = 
+              tableHtml.includes('Média de gols') || 
+              tableHtml.includes('> 2,5') || 
+              tableHtml.includes('< 2,5') ||
+              (tableHtml.includes('média') && (tableHtml.includes('gols') || tableHtml.includes('gol')));
+            
+            if (isGoalStatsTable) {
+              const exists = allGoalStatsTables.some(t => t.teamName === teamName && t.tableHtml === tableHtml);
+              if (!exists) {
+                allGoalStatsTables.push({ teamName, tableHtml, index: tableIndex++ });
+                console.log(`[Goal Stats] ESTRATÉGIA 3: Tabela ${tableIndex} encontrada para: "${teamName}"`);
+              }
             }
           }
         }
