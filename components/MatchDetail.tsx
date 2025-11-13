@@ -8,7 +8,8 @@ import { GoalAnalysisTab } from './GoalAnalysisTab';
 import { GeminiAnalysis } from './GeminiAnalysis';
 import { ProbabilityAnalysisTab } from './ProbabilityAnalysisTab';
 import { UpdateMatchDetails } from './UpdateMatchDetails';
-import type { MatchDetails, Tab } from '../types';
+import { UpdateLiveStatus } from './UpdateLiveStatus';
+import type { MatchDetails, Tab, LiveMatchStatus, MatchOdds } from '../types';
 
 interface MatchDetailProps {
   match: MatchDetails;
@@ -23,6 +24,14 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
 
   const handleDetailsUpdated = (updatedMatch: MatchDetails) => {
     setCurrentMatch(updatedMatch);
+  };
+
+  const handleLiveStatusUpdated = (matchId: string, liveStatus?: LiveMatchStatus, odds?: MatchOdds) => {
+    setCurrentMatch(prev => ({
+      ...prev,
+      liveStatus: liveStatus || prev.liveStatus,
+      odds: odds || prev.odds
+    }));
   };
 
   const renderTabContent = () => {
@@ -83,6 +92,7 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
             Voltar para a lista de jogos
         </button>
         <UpdateMatchDetails match={currentMatch} onDetailsUpdated={handleDetailsUpdated} />
+        <UpdateLiveStatus match={currentMatch} onStatusUpdated={handleLiveStatusUpdated} />
         <MatchHeader 
           teamA={currentMatch.teamA} 
           teamB={currentMatch.teamB} 
@@ -90,6 +100,8 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
           matchId={currentMatch.id}
           isFavorite={isFavorite}
           onToggleFavorite={onToggleFavorite}
+          liveStatus={currentMatch.liveStatus}
+          odds={currentMatch.odds}
         />
         <div className="mt-8">
             <Tabs activeTab={activeTab} setActiveTab={setActiveTab} />

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { MatchDetails } from '../types';
+import type { MatchDetails, LiveMatchStatus, MatchOdds } from '../types';
 
 interface SportsEvent {
   '@type': string;
@@ -184,6 +184,97 @@ function extractMatchesFromHTML(html: string): SportsEvent[] {
   }
   
   return matches;
+}
+
+// Função para extrair status ao vivo de um evento específico no HTML
+function extractLiveStatusFromEvent(html: string, eventUrl: string): LiveMatchStatus | undefined {
+  // Procura por seções relacionadas ao evento específico
+  const eventSection = html.includes(eventUrl) 
+    ? html.substring(Math.max(0, html.indexOf(eventUrl) - 5000), html.indexOf(eventUrl) + 5000)
+    : '';
+
+  if (!eventSection) return undefined;
+
+  const status: LiveMatchStatus = {
+    isLive: false,
+    status: 'scheduled',
+    lastUpdated: new Date().toISOString()
+  };
+
+  // Procura por indicadores de jogo ao vivo
+  const liveIndicators = [
+    /ao\s+vivo/i,
+    /live/i,
+    /em\s+andamento/i,
+    /jogando\s+agora/i
+  ];
+
+  const isLive = liveIndicators.some(pattern => pattern.test(eventSection));
+  
+  if (isLive) {
+    status.isLive = true;
+    status.status = 'live';
+  }
+
+  // Extrai minuto do jogo
+  const minuteMatch = eventSection.match(/(\d+)\s*['']?\s*(min|minuto)/i);
+  if (minuteMatch) {
+    status.minute = parseInt(minuteMatch[1]) || undefined;
+  }
+
+  // Verifica se está no intervalo
+  if (eventSection.match(/intervalo|half.?time|ht/i)) {
+    status.status = 'halftime';
+  }
+
+  // Verifica se terminou
+  if (eventSection.match(/finalizado|terminado|finished|ft/i)) {
+    status.status = 'finished';
+    status.isLive = false;
+  }
+
+  // Extrai placar atual
+  const scoreMatch = eventSection.match(/(\d+)\s*[-:]\s*(\d+)/);
+  if (scoreMatch) {
+    status.homeScore = parseInt(scoreMatch[1]) || undefined;
+    status.awayScore = parseInt(scoreMatch[2]) || undefined;
+  }
+
+  return status.isLive || status.status !== 'scheduled' ? status : undefined;
+}
+
+// Função para extrair odds de um evento específico no HTML
+function extractOddsFromEvent(html: string, eventUrl: string): MatchOdds | undefined {
+  // Procura por seções relacionadas ao evento específico
+  const eventSection = html.includes(eventUrl) 
+    ? html.substring(Math.max(0, html.indexOf(eventUrl) - 3000), html.indexOf(eventUrl) + 3000)
+    : '';
+
+  if (!eventSection) return undefined;
+
+  const odds: MatchOdds = {
+    lastUpdated: new Date().toISOString()
+  };
+
+  // Procura por padrões de odds próximos ao evento
+  // Formato comum: números entre 1.0 e 10.0 que podem ser odds
+  const oddsPattern = /\b([1-9]\.\d{1,2}|[2-9]\.\d)\b/g;
+  const matches = eventSection.match(oddsPattern);
+  
+  if (matches && matches.length >= 3) {
+    const values = matches.map(m => parseFloat(m)).filter(v => v >= 1.0 && v <= 10.0);
+    if (values.length >= 3) {
+      odds.homeWin = values[0];
+      odds.draw = values[1];
+      odds.awayWin = values[2];
+    }
+    if (values.length >= 5) {
+      odds.over1_5 = values[3];
+      odds.under1_5 = values[4];
+    }
+  }
+
+  return (odds.homeWin || odds.over1_5) ? odds : undefined;
 }
 
 // Dados placeholder para campos que não estão no HTML
@@ -387,6 +478,26 @@ export default async function handler(
       
       console.log('Eventos extraídos:', events.length);
       
+      // Extrai status ao vivo e odds do HTML completo (se disponível)
+      const allLiveStatuses = new Map<string, LiveMatchStatus>();
+      const allOdds = new Map<string, MatchOdds>();
+      
+      for (const event of events) {
+        if (event.url) {
+          const liveStatus = extractLiveStatusFromEvent(html, event.url);
+          if (liveStatus) {
+            const matchId = `${event.homeTeam.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${event.awayTeam.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+            allLiveStatuses.set(matchId, liveStatus);
+          }
+          
+          const odds = extractOddsFromEvent(html, event.url);
+          if (odds) {
+            const matchId = `${event.homeTeam.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${event.awayTeam.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+            allOdds.set(matchId, odds);
+          }
+        }
+      }
+      
       if (events.length === 0) {
         // Tenta encontrar o motivo
         const hasScript = html.includes('application/ld+json');
@@ -406,9 +517,19 @@ export default async function handler(
       }
 
       // Converte para MatchDetails
-      const matches = events.map(convertToMatchDetails).filter(m => m.id) as MatchDetails[];
+      const matches = events.map(event => {
+        const match = convertToMatchDetails(event);
+        // Adiciona status ao vivo e odds se disponíveis
+        const liveStatus = allLiveStatuses.get(match.id);
+        const odds = allOdds.get(match.id);
+        if (liveStatus) match.liveStatus = liveStatus;
+        if (odds) match.odds = odds;
+        return match;
+      }).filter(m => m.id) as MatchDetails[];
 
       console.log('Matches convertidos:', matches.length);
+      console.log('Jogos ao vivo encontrados:', matches.filter(m => m.liveStatus?.isLive).length);
+      console.log('Jogos com odds encontrados:', matches.filter(m => m.odds).length);
 
       // Aqui você pode salvar no banco de dados (Supabase) se necessário
       // Por enquanto, apenas retorna os dados processados

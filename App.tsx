@@ -3,6 +3,8 @@ import { Header } from './components/Header';
 import { MatchList } from './components/MatchList';
 import { MatchDetail } from './components/MatchDetail';
 import { UpdateMatches } from './components/UpdateMatches';
+import { LiveStatusControl } from './components/LiveStatusControl';
+import { useLiveStatusPolling } from './hooks/useLiveStatusPolling';
 import { allMatchesData } from './data';
 import type { MatchDetails } from './types';
 
@@ -74,12 +76,31 @@ const App: React.FC = () => {
     });
   };
 
+  // Polling automático para jogos ao vivo
+  const liveMatches = matches.filter(m => m.liveStatus?.isLive);
+  const { isPolling, startPolling, stopPolling } = useLiveStatusPolling(
+    matches,
+    handleMatchesUpdated,
+    {
+      intervalMs: 30000, // 30 segundos
+      enabled: liveMatches.length > 0
+    }
+  );
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!selectedMatch && (
-          <UpdateMatches onMatchesUpdated={handleMatchesUpdated} />
+          <>
+            <UpdateMatches onMatchesUpdated={handleMatchesUpdated} />
+            <LiveStatusControl
+              isPolling={isPolling}
+              onStart={startPolling}
+              onStop={stopPolling}
+              liveMatchesCount={liveMatches.length}
+            />
+          </>
         )}
         {selectedMatch ? (
           <MatchDetail 

@@ -53,6 +53,28 @@ export interface MatchInfo {
     competition: string;
 }
 
+export interface MatchOdds {
+    homeWin?: number;
+    draw?: number;
+    awayWin?: number;
+    over1_5?: number;
+    under1_5?: number;
+    over2_5?: number;
+    under2_5?: number;
+    lastUpdated?: string;
+}
+
+export interface LiveMatchStatus {
+    isLive: boolean;
+    status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled';
+    minute?: number;
+    homeScore?: number;
+    awayScore?: number;
+    homeScoreHT?: number;
+    awayScoreHT?: number;
+    lastUpdated?: string;
+}
+
 export interface TeamStreaks {
   winStreak: number;
   drawStreak: number;
@@ -104,6 +126,8 @@ export interface MatchDetails {
   teamBGoalPatterns: ScopedStats<GoalScoringPatterns>;
   teamACorrectScores: ScopedStats<{ ht: CorrectScore[]; ft: CorrectScore[] }>;
   teamBCorrectScores: ScopedStats<{ ht: CorrectScore[]; ft: CorrectScore[] }>;
+  liveStatus?: LiveMatchStatus;
+  odds?: MatchOdds;
 }
 
 export interface CardProps {

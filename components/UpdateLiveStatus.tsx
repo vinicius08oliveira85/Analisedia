@@ -1,0 +1,72 @@
+import React, { useState } from 'react';
+import { updateLiveStatus } from '../services/liveStatusService';
+import type { MatchDetails, LiveMatchStatus, MatchOdds } from '../types';
+
+interface UpdateLiveStatusProps {
+  match: MatchDetails;
+  onStatusUpdated: (matchId: string, liveStatus?: LiveMatchStatus, odds?: MatchOdds) => void;
+}
+
+export const UpdateLiveStatus: React.FC<UpdateLiveStatusProps> = ({ match, onStatusUpdated }) => {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handlePasteHTML = async () => {
+    try {
+      const html = await navigator.clipboard.readText();
+      if (!html || html.trim().length === 0) {
+        setMessage({ type: 'error', text: 'Nenhum texto encontrado na área de transferência' });
+        return;
+      }
+
+      setIsUpdating(true);
+      setMessage(null);
+
+      const result = await updateLiveStatus(html, match.id);
+      
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message });
+        onStatusUpdated(match.id, result.liveStatus, result.odds);
+      } else {
+        setMessage({ type: 'error', text: 'Erro ao atualizar status' });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao atualizar status ao vivo';
+      setMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div className="bg-gray-800 rounded-lg p-4 mb-4 border border-gray-700">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-white">Atualizar Status ao Vivo e Odds</h3>
+        <button
+          onClick={handlePasteHTML}
+          disabled={isUpdating}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-xs font-medium transition-colors"
+        >
+          {isUpdating ? 'Processando...' : 'Colar HTML da Página do Jogo'}
+        </button>
+      </div>
+
+      {message && (
+        <div
+          className={`p-2 rounded-md text-xs ${
+            message.type === 'success'
+              ? 'bg-green-900/50 border border-green-700 text-green-200'
+              : 'bg-red-900/50 border border-red-700 text-red-200'
+          }`}
+        >
+          <p>{message.text}</p>
+        </div>
+      )}
+
+      <p className="text-gray-400 text-xs mt-2">
+        💡 <strong>Dica:</strong> Acesse a página do jogo no site e cole o HTML aqui para atualizar status ao vivo e odds
+      </p>
+    </div>
+  );
+};
+
