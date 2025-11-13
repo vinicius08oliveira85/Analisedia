@@ -308,57 +308,124 @@ function convertToMatchDetails(event: any): MatchDetails | null {
 }
 
 // Função para parsear jogo de células de tabela
-function parseMatchFromCells(cells: string[], html: string): MatchDetails | null {
-  // Implementação básica - pode ser melhorada conforme a estrutura do sokkerpro
-  // Procura por padrões como: "Time A vs Time B", "Time A x Time B", etc.
-  
+function parseMatchFromCells(cells: string[], fullHtml: string): MatchDetails | null {
   let teamA = '';
   let teamB = '';
   let date = '';
   let time = '';
   let competition = '';
   
+  // Estratégia 1: Procura por célula com "vs", "x", "-", "v"
   for (const cell of cells) {
-    // Procura por separadores de times
-    if (cell.includes(' vs ') || cell.includes(' x ') || cell.includes(' - ')) {
-      const parts = cell.split(/ vs | x | - /);
-      if (parts.length === 2) {
-        teamA = parts[0].trim();
-        teamB = parts[1].trim();
+    const vsPatterns = [
+      /([^\-–—]+?)\s*(?:vs|v|×|x|-|–|—)\s*(.+)/i,
+      /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:vs|v|×|x|-|–|—)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i
+    ];
+    
+    for (const pattern of vsPatterns) {
+      const match = cell.match(pattern);
+      if (match && match[1] && match[2]) {
+        teamA = match[1].trim();
+        teamB = match[2].trim();
+        break;
       }
     }
     
-    // Procura por data (formato DD/MM/YYYY ou similar)
-    const dateMatch = cell.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
-    if (dateMatch) {
-      date = dateMatch[1];
+    if (teamA && teamB) break;
+  }
+  
+  // Estratégia 2: Se não encontrou "vs", assume que times estão em células separadas
+  if (!teamA || !teamB) {
+    // Procura por células que parecem nomes de times (mais de 3 caracteres, não são números/datas)
+    const potentialTeams = cells.filter(cell => {
+      const cleaned = cell.trim();
+      return cleaned.length >= 3 && 
+             !/\d{1,2}[\/\-]\d{1,2}/.test(cleaned) && // Não é data
+             !/\d{1,2}:\d{2}/.test(cleaned) && // Não é hora
+             !/^\d+$/.test(cleaned) && // Não é só número
+             !cleaned.toLowerCase().includes('league') &&
+             !cleaned.toLowerCase().includes('cup');
+    });
+    
+    if (potentialTeams.length >= 2) {
+      teamA = potentialTeams[0].trim();
+      teamB = potentialTeams[1].trim();
+    }
+  }
+  
+  // Procura data e hora em todas as células
+  for (const cell of cells) {
+    // Procura por data (vários formatos)
+    const datePatterns = [
+      /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,
+      /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+      /(today|hoje|amanhã|tomorrow)/i
+    ];
+    
+    for (const pattern of datePatterns) {
+      const dateMatch = cell.match(pattern);
+      if (dateMatch) {
+        date = dateMatch[1];
+        break;
+      }
     }
     
-    // Procura por hora (formato HH:MM)
+    // Procura por hora
     const timeMatch = cell.match(/(\d{1,2}:\d{2})/);
     if (timeMatch) {
       time = timeMatch[1];
     }
+    
+    // Procura por competição
+    if (cell.length > 5 && 
+        (cell.toLowerCase().includes('league') || 
+         cell.toLowerCase().includes('cup') || 
+         cell.toLowerCase().includes('championship') ||
+         cell.toLowerCase().includes('liga') ||
+         cell.toLowerCase().includes('campeonato'))) {
+      competition = cell;
+    }
   }
   
-  if (!teamA || !teamB) {
+  // Validação: precisa ter pelo menos dois times
+  if (!teamA || !teamB || teamA.length < 2 || teamB.length < 2 || teamA === teamB) {
     return null;
   }
   
-  // Cria MatchDetails básico
-  const matchId = `sokkerpro_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  // Converte data para formato ISO se necessário
+  // Converte data
   let dateStr = new Date().toISOString().split('T')[0];
   if (date) {
     try {
-      const [day, month, year] = date.split(/[\/\-]/);
-      const fullYear = year.length === 2 ? `20${year}` : year;
-      dateStr = `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      if (date.toLowerCase().includes('today') || date.toLowerCase().includes('hoje')) {
+        dateStr = new Date().toISOString().split('T')[0];
+      } else if (date.toLowerCase().includes('tomorrow') || date.toLowerCase().includes('amanhã')) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        dateStr = tomorrow.toISOString().split('T')[0];
+      } else {
+        const parts = date.split(/[\/\-]/);
+        if (parts.length === 3) {
+          let day, month, year;
+          if (parts[0].length === 4) {
+            // Formato YYYY-MM-DD
+            year = parts[0];
+            month = parts[1];
+            day = parts[2];
+          } else {
+            // Formato DD-MM-YYYY ou DD/MM/YYYY
+            day = parts[0];
+            month = parts[1];
+            year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+          }
+          dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+      }
     } catch (e) {
       // Mantém data atual
     }
   }
+  
+  const matchId = `sokkerpro_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
   return {
     id: matchId,
