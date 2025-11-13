@@ -122,7 +122,16 @@ function extractMatchesFromSokkerPro(html: string): MatchDetails[] {
       const tableHtml = tableMatch[1];
       
       // Verifica se a tabela parece conter jogos (tem times, datas, etc)
-      if (!tableHtml.includes('vs') && !tableHtml.includes('x') && !tableHtml.includes(':')) {
+      // Padrões mais flexíveis
+      const hasMatchIndicators = tableHtml.includes('vs') || 
+                                 tableHtml.includes('x') || 
+                                 tableHtml.includes(':') ||
+                                 tableHtml.includes('match') ||
+                                 tableHtml.includes('game') ||
+                                 tableHtml.includes('team') ||
+                                 /<tr[^>]*>[\s\S]*?<td[^>]*>[\s\S]*?\d{1,2}:\d{2}[\s\S]*?<\/td>/i.test(tableHtml);
+      
+      if (!hasMatchIndicators) {
         continue;
       }
       
@@ -131,6 +140,11 @@ function extractMatchesFromSokkerPro(html: string): MatchDetails[] {
       
       while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
         const rowHtml = rowMatch[1];
+        
+        // Pula cabeçalhos
+        if (rowHtml.includes('<th') || rowHtml.includes('header')) {
+          continue;
+        }
         
         // Extrai células
         const cells: string[] = [];
@@ -141,7 +155,7 @@ function extractMatchesFromSokkerPro(html: string): MatchDetails[] {
           cells.push(cleanHTMLText(cellMatch[1]));
         }
         
-        if (cells.length >= 3) {
+        if (cells.length >= 2) {
           // Tenta identificar times, data, hora
           const match = parseMatchFromCells(cells, html);
           if (match) matches.push(match);

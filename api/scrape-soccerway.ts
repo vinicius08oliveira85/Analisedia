@@ -81,63 +81,104 @@ function extractMatchesFromSoccerway(html: string): MatchDetails[] {
   
   // Estratégia 1: Busca por estrutura específica do Soccerway/FlashScore (event__match)
   // O Soccerway usa classes como "event__match", "event__homeTeam", "event__awayTeam"
-  const eventMatchRegex = /<div[^>]*class="[^"]*event__match[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
-  let eventMatch;
+  // Também pode usar outras variações como "event event--twoLine", "event__participant"
   
-  while ((eventMatch = eventMatchRegex.exec(html)) !== null) {
-    const eventHtml = eventMatch[1];
-    
-    // Extrai times
-    const homeTeamMatch = eventHtml.match(/<div[^>]*class="[^"]*event__homeTeam[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i);
-    const awayTeamMatch = eventHtml.match(/<div[^>]*class="[^"]*event__awayTeam[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i);
-    
-    if (homeTeamMatch && awayTeamMatch) {
-      const teamA = cleanHTMLText(homeTeamMatch[1]);
-      const teamB = cleanHTMLText(awayTeamMatch[1]);
+  // Padrão mais flexível para encontrar eventos
+  const eventPatterns = [
+    /<div[^>]*class="[^"]*event__match[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    /<div[^>]*class="[^"]*event[^"]*event--twoLine[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    /<div[^>]*class="[^"]*event[^"]*"[^>]*data-event-id[^>]*>([\s\S]*?)<\/div>/gi
+  ];
+  
+  for (const eventMatchRegex of eventPatterns) {
+    let eventMatch;
+    while ((eventMatch = eventMatchRegex.exec(html)) !== null) {
+      const eventHtml = eventMatch[1];
       
-      // Extrai data/hora
-      const timeMatch = eventHtml.match(/<span[^>]*class="[^"]*event__time[^"]*"[^>]*>([^<]+)<\/span>/i);
-      const dateMatch = eventHtml.match(/<span[^>]*class="[^"]*event__date[^"]*"[^>]*>([^<]+)<\/span>/i);
+      // Extrai times - múltiplos padrões
+      let homeTeamMatch = eventHtml.match(/<div[^>]*class="[^"]*event__homeTeam[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i) ||
+                          eventHtml.match(/<div[^>]*class="[^"]*event__participant[^"]*event__participant--home[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i) ||
+                          eventHtml.match(/<span[^>]*class="[^"]*event__participant--home[^"]*"[^>]*>([^<]+)<\/span>/i);
       
-      // Extrai URL do jogo
-      const linkMatch = eventHtml.match(/<a[^>]*href="([^"]*)"[^>]*>/i);
-      const matchUrl = linkMatch ? linkMatch[1] : undefined;
+      let awayTeamMatch = eventHtml.match(/<div[^>]*class="[^"]*event__awayTeam[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i) ||
+                          eventHtml.match(/<div[^>]*class="[^"]*event__participant[^"]*event__participant--away[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i) ||
+                          eventHtml.match(/<span[^>]*class="[^"]*event__participant--away[^"]*"[^>]*>([^<]+)<\/span>/i);
       
-      // Extrai competição (geralmente está em um elemento pai)
-      const competitionMatch = html.match(/<div[^>]*class="[^"]*event__title[^"]*"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/i) ||
-                                html.match(/<span[^>]*class="[^"]*event__league[^"]*"[^>]*>([^<]+)<\/span>/i);
-      
-      let dateStr = new Date().toISOString().split('T')[0];
-      let timeStr = timeMatch ? cleanHTMLText(timeMatch[1]) : '00:00';
-      
-      if (dateMatch) {
-        try {
-          const dateText = cleanHTMLText(dateMatch[1]);
-          // Tenta parsear data no formato do Soccerway
-          const parsedDate = new Date(dateText);
-          if (!isNaN(parsedDate.getTime())) {
-            dateStr = parsedDate.toISOString().split('T')[0];
-          }
-        } catch (e) {
-          // Mantém data atual
+      // Se não encontrou com padrões específicos, tenta padrão genérico
+      if (!homeTeamMatch || !awayTeamMatch) {
+        const allParticipants = eventHtml.match(/<span[^>]*class="[^"]*event__participant[^"]*"[^>]*>([^<]+)<\/span>/gi);
+        if (allParticipants && allParticipants.length >= 2) {
+          homeTeamMatch = [null, cleanHTMLText(allParticipants[0].replace(/<[^>]+>/g, ''))];
+          awayTeamMatch = [null, cleanHTMLText(allParticipants[1].replace(/<[^>]+>/g, ''))];
         }
       }
       
-      const matchId = `soccerway_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const fullUrl = matchUrl && !matchUrl.startsWith('http') ? `https://www.soccerway.com${matchUrl}` : matchUrl;
-      
-      matches.push(createMatchDetails(
-        matchId,
-        teamA,
-        teamB,
-        '',
-        '',
-        dateStr,
-        timeStr,
-        competitionMatch ? cleanHTMLText(competitionMatch[1]) : 'Competição',
-        fullUrl
-      ));
+      if (homeTeamMatch && awayTeamMatch) {
+        const teamA = cleanHTMLText(homeTeamMatch[1] || homeTeamMatch[0]);
+        const teamB = cleanHTMLText(awayTeamMatch[1] || awayTeamMatch[0]);
+        
+        // Valida que são nomes válidos de times
+        if (teamA.length < 2 || teamB.length < 2 || teamA === teamB) {
+          continue;
+        }
+        
+        // Extrai data/hora
+        const timeMatch = eventHtml.match(/<span[^>]*class="[^"]*event__time[^"]*"[^>]*>([^<]+)<\/span>/i) ||
+                          eventHtml.match(/<span[^>]*class="[^"]*event__stage--block[^"]*"[^>]*>([^<]+)<\/span>/i);
+        const dateMatch = eventHtml.match(/<span[^>]*class="[^"]*event__date[^"]*"[^>]*>([^<]+)<\/span>/i);
+        
+        // Extrai URL do jogo
+        const linkMatch = eventHtml.match(/<a[^>]*href="([^"]*\/matches\/[^"]*)"[^>]*>/i) ||
+                          eventHtml.match(/<a[^>]*href="([^"]*\/match\/[^"]*)"[^>]*>/i);
+        const matchUrl = linkMatch ? linkMatch[1] : undefined;
+        
+        // Extrai competição - busca no contexto do evento
+        let competitionMatch = eventHtml.match(/<span[^>]*class="[^"]*event__title[^"]*"[^>]*>([^<]+)<\/span>/i) ||
+                              eventHtml.match(/<span[^>]*class="[^"]*event__league[^"]*"[^>]*>([^<]+)<\/span>/i);
+        
+        // Se não encontrou no evento, busca no contexto HTML próximo
+        if (!competitionMatch) {
+          const eventIndex = html.indexOf(eventMatch[0]);
+          const contextBefore = html.substring(Math.max(0, eventIndex - 500), eventIndex);
+          competitionMatch = contextBefore.match(/<span[^>]*class="[^"]*event__title[^"]*"[^>]*>([^<]+)<\/span>/i) ||
+                            contextBefore.match(/<span[^>]*class="[^"]*event__league[^"]*"[^>]*>([^<]+)<\/span>/i);
+        }
+        
+        let dateStr = new Date().toISOString().split('T')[0];
+        let timeStr = timeMatch ? cleanHTMLText(timeMatch[1]) : '00:00';
+        
+        if (dateMatch) {
+          try {
+            const dateText = cleanHTMLText(dateMatch[1]);
+            // Tenta parsear data no formato do Soccerway
+            const parsedDate = new Date(dateText);
+            if (!isNaN(parsedDate.getTime())) {
+              dateStr = parsedDate.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            // Mantém data atual
+          }
+        }
+        
+        const matchId = `soccerway_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const fullUrl = matchUrl && !matchUrl.startsWith('http') ? `https://www.soccerway.com${matchUrl}` : matchUrl;
+        
+        matches.push(createMatchDetails(
+          matchId,
+          teamA,
+          teamB,
+          '',
+          '',
+          dateStr,
+          timeStr,
+          competitionMatch ? cleanHTMLText(competitionMatch[1]) : 'Competição',
+          fullUrl
+        ));
+      }
     }
+    
+    // Se encontrou jogos com este padrão, para de tentar outros
+    if (matches.length > 0) break;
   }
   
   // Estratégia 2: Busca por JSON-LD (Schema.org)
