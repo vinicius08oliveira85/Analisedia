@@ -1228,7 +1228,8 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
   const tableRegex = /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*(?:stat-last10|stat-seqs)[^"]*"[^>]*>([\s\S]*?)<\/table>/gi;
   
   let match;
-  const goalStatsTables: Array<{ teamName: string; tableHtml: string }> = [];
+  const goalStatsTables: Array<{ teamName: string; tableHtml: string; index: number }> = [];
+  let tableIndex = 0;
   
   while ((match = tableRegex.exec(sectionHtml)) !== null) {
     const foundTeamName = match[1].trim();
@@ -1241,24 +1242,43 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
         tableHtml.includes('Jogos sem') ||
         tableHtml.includes('Média de gols marcados') ||
         tableHtml.includes('Média de gols sofridos')) {
-      goalStatsTables.push({ teamName: foundTeamName, tableHtml });
-      console.log(`[extractGoalStats] Tabela de goal stats encontrada para: ${foundTeamName}`);
+      goalStatsTables.push({ teamName: foundTeamName, tableHtml, index: tableIndex++ });
+      console.log(`[extractGoalStats] Tabela ${tableIndex} de goal stats encontrada para: "${foundTeamName}"`);
     }
   }
+  
+  console.log(`[extractGoalStats] Total de ${goalStatsTables.length} tabelas encontradas. Buscando para: "${teamName}" (normalizado: "${normalizedTeam}")`);
   
   // Encontra a tabela do time específico - busca exata primeiro, depois flexível
   let foundTable = goalStatsTables.find(t => {
     const foundNormalized = normalizeTeamName(t.teamName);
-    return foundNormalized === normalizedTeam;
+    const isExactMatch = foundNormalized === normalizedTeam;
+    if (isExactMatch) {
+      console.log(`[extractGoalStats] ✓ Match EXATO encontrado: "${t.teamName}" (normalizado: "${foundNormalized}") === "${normalizedTeam}"`);
+    }
+    return isExactMatch;
   });
   
-  // Se não encontrou exato, tenta busca flexível
+  // Se não encontrou exato, tenta busca flexível (mas mais restritiva)
   if (!foundTable) {
-    foundTable = goalStatsTables.find(t => {
+    console.log(`[extractGoalStats] Buscando match flexível para "${normalizedTeam}"...`);
+    for (const t of goalStatsTables) {
       const foundNormalized = normalizeTeamName(t.teamName);
-      return foundNormalized.includes(normalizedTeam) || 
-             normalizedTeam.includes(foundNormalized);
-    });
+      const foundCleaned = foundNormalized.replace(/[^a-z0-9]/g, '');
+      const searchCleaned = normalizedTeam.replace(/[^a-z0-9]/g, '');
+      
+      // Match flexível: um contém o outro E tem pelo menos 4 caracteres em comum
+      const hasMatch = (foundCleaned.includes(searchCleaned) || searchCleaned.includes(foundCleaned)) &&
+                      (foundCleaned.length >= 4 && searchCleaned.length >= 4);
+      
+      if (hasMatch) {
+        console.log(`[extractGoalStats] ✓ Match FLEXÍVEL encontrado: "${t.teamName}" (normalizado: "${foundNormalized}") ~= "${normalizedTeam}"`);
+        foundTable = t;
+        break;
+      } else {
+        console.log(`[extractGoalStats]   - Não match: "${t.teamName}" (normalizado: "${foundNormalized}") vs "${normalizedTeam}"`);
+      }
+    }
   }
   
   let tableHtml = '';
