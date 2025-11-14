@@ -142,8 +142,13 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
     }
   };
 
+  // Scroll para o topo quando o componente é montado
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [match.id]);
+
   return (
-    <div>
+    <div style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}>
         <button 
             onClick={(e) => {
               e.preventDefault();

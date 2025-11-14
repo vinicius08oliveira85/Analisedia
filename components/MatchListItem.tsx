@@ -27,7 +27,10 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
     e.preventDefault();
     e.stopPropagation();
     console.log('Card acionado, abrindo detalhes do match:', match.id);
-    onClick();
+    // Pequeno delay para garantir que o evento foi processado corretamente
+    setTimeout(() => {
+      onClick();
+    }, 100);
   };
 
   const isLive = match.liveStatus?.isLive || false;

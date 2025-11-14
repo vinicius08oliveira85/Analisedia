@@ -112,6 +112,8 @@ const App: React.FC = () => {
     if (match) {
       console.log('Match encontrado:', match.teamA.name, 'vs', match.teamB.name);
       setSelectedMatch(match);
+      // Scroll suave para o topo quando abrir os detalhes
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       console.warn('Jogo não encontrado:', matchId);
       console.warn('IDs disponíveis:', todayMatches.map(m => m.id), matches.map(m => m.id));
