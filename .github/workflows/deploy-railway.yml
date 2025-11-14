@@ -23,17 +23,6 @@ jobs:
       - name: Instalar dependências
         run: npm ci
       
-      - name: Build do projeto
-        run: npm run build
-      
-      - name: Verificar build
-        run: |
-          if [ ! -d "dist" ]; then
-            echo "Erro: Diretório dist não foi criado"
-            exit 1
-          fi
-          echo "✅ Build concluído com sucesso!"
-      
       - name: Instalar Railway CLI
         run: npm install -g @railway/cli@latest
       
@@ -46,6 +35,7 @@ jobs:
           echo "🚀 Iniciando deploy para Railway..."
           echo "📋 Project ID: ${RAILWAY_PROJECT_ID:-não configurado}"
           echo "📋 Service ID: ${RAILWAY_SERVICE_ID:-não configurado}"
+          
           # Verifica se o token está configurado
           if [ -z "$RAILWAY_TOKEN" ] || [ "$RAILWAY_TOKEN" == "" ]; then
             echo "⚠️ Aviso: RAILWAY_TOKEN não está configurado nos secrets do GitHub"
@@ -59,17 +49,21 @@ jobs:
           fi
           echo "✅ Token configurado, continuando deploy..."
           
+          # Autentica no Railway
+          echo "🔐 Autenticando no Railway..."
+          echo "$RAILWAY_TOKEN" | railway login --token
+          
           # Linka o projeto ao Railway (se necessário)
           if [ -n "$RAILWAY_PROJECT_ID" ] && [ "$RAILWAY_PROJECT_ID" != "" ]; then
             echo "🔗 Linking projeto: $RAILWAY_PROJECT_ID"
             railway link $RAILWAY_PROJECT_ID || true
           fi
           
-          # Faz o deploy
-          echo "📦 Fazendo deploy..."
+          # Faz o deploy usando o Dockerfile
+          echo "📦 Fazendo deploy via Dockerfile..."
           if [ -n "$RAILWAY_SERVICE_ID" ] && [ "$RAILWAY_SERVICE_ID" != "" ]; then
             echo "🎯 Usando serviço específico: $RAILWAY_SERVICE_ID"
-            railway up --service $RAILWAY_SERVICE_ID
+            railway up --service $RAILWAY_SERVICE_ID --detach
           else
             echo "⚠️ RAILWAY_SERVICE_ID não configurado. Tentando deploy sem especificar serviço..."
             echo "📝 Se houver múltiplos serviços, configure RAILWAY_SERVICE_ID nos secrets do GitHub"
@@ -81,7 +75,7 @@ jobs:
             echo "      https://railway.app/project/3e8b514d-d2d2-4e3a-a61b-e66bcd1a7ed7/service/[SERVICE_ID]"
             echo "   4. Copie o SERVICE_ID (parte após /service/)"
             echo ""
-            railway up || {
+            railway up --detach || {
               echo "❌ Erro: Múltiplos serviços encontrados. Configure RAILWAY_SERVICE_ID nos secrets."
               echo ""
               echo "📝 Para configurar:"
