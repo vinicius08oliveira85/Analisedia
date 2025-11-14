@@ -9,6 +9,17 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Health check endpoint (Railway usa isso para verificar se o serviço está rodando)
+// IMPORTANTE: Deve ser ANTES de qualquer outro middleware que possa interferir
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    port: PORT
+  });
+});
+
 // Middleware para parsing JSON
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -162,11 +173,29 @@ async function startServer() {
     });
     console.log('✅ Roteamento SPA configurado');
     
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📦 Ambiente: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Acesse: http://0.0.0.0:${PORT}`);
     });
+
+    // Tratamento adequado de sinais para graceful shutdown
+    const gracefulShutdown = (signal) => {
+      console.log(`\n📡 Recebido sinal ${signal}, encerrando servidor graciosamente...`);
+      server.close(() => {
+        console.log('✅ Servidor encerrado com sucesso');
+        process.exit(0);
+      });
+      
+      // Força o encerramento após 10 segundos se não conseguir fechar graciosamente
+      setTimeout(() => {
+        console.error('⚠️ Forçando encerramento do servidor...');
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   } catch (error) {
     console.error('❌ Erro ao iniciar servidor:', error);
     console.error('Stack trace:', error.stack);
@@ -174,17 +203,18 @@ async function startServer() {
   }
 }
 
-// Tratamento de erros não capturados
+// Tratamento de erros não capturados (mas não encerra o processo imediatamente)
 process.on('uncaughtException', (error) => {
   console.error('💥 Erro não capturado:', error);
   console.error('Stack:', error.stack);
-  process.exit(1);
+  // Não encerra o processo imediatamente, apenas loga o erro
+  // O Railway pode reiniciar se necessário
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('💥 Promise rejeitada não tratada:', reason);
   console.error('Promise:', promise);
-  process.exit(1);
+  // Não encerra o processo imediatamente, apenas loga o erro
 });
 
 startServer();
