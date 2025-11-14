@@ -5,9 +5,44 @@ import type { Match, TeamStreaks, OpponentAnalysisMatch, ScopedStats } from '../
 // Como não podemos fazer import direto, vamos copiar a lógica essencial
 
 // Função para fazer fetch do HTML do site
+// URL do serviço FastAPI de scraping (se configurado)
+const SCRAPER_SERVICE_URL = process.env.SCRAPER_SERVICE_URL || '';
+
 async function fetchSiteHTML(url: string): Promise<string> {
   try {
-    // Headers mais completos para parecer um navegador real e evitar bloqueio 403
+    // Se o serviço FastAPI estiver configurado, usa ele primeiro
+    if (SCRAPER_SERVICE_URL) {
+      try {
+        console.log('Tentando usar serviço FastAPI de scraping...');
+        const scraperResponse = await fetch(`${SCRAPER_SERVICE_URL}/scrape?url=${encodeURIComponent(url)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(35000),
+        });
+
+        if (scraperResponse.ok) {
+          const scraperData = await scraperResponse.json();
+          if (scraperData.success && scraperData.html) {
+            console.log('✅ HTML obtido via serviço FastAPI');
+            return scraperData.html;
+          } else {
+            console.warn('Serviço FastAPI retornou erro:', scraperData.message);
+            // Continua para tentar método direto
+          }
+        } else {
+          console.warn('Serviço FastAPI não disponível, tentando método direto...');
+          // Continua para tentar método direto
+        }
+      } catch (scraperError) {
+        console.warn('Erro ao usar serviço FastAPI, tentando método direto:', scraperError);
+        // Continua para tentar método direto
+      }
+    }
+
+    // Método direto (fallback)
+    console.log('Usando método direto de scraping...');
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
