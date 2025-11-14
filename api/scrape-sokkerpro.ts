@@ -6,6 +6,17 @@ interface LeagueGroup {
   matches: MatchDetails[];
 }
 
+// Função auxiliar para criar AbortSignal com timeout (compatível com Node.js antigo)
+function createTimeoutSignal(timeoutMs: number): AbortSignal {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  // Limpa o timeout se o signal for abortado manualmente
+  controller.signal.addEventListener('abort', () => clearTimeout(timeoutId));
+  
+  return controller.signal;
+}
+
 // Função para fazer fetch do HTML do site (com suporte a renderização JS)
 async function fetchSiteHTML(url: string, useRenderer: boolean = false): Promise<string> {
   // Se o renderizador estiver disponível e solicitado, usa ele
@@ -57,7 +68,7 @@ async function fetchSiteHTML(url: string, useRenderer: boolean = false): Promise
         'Referer': 'https://www.google.com/',
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(30000),
+      signal: createTimeoutSignal(30000),
     });
 
     if (!response.ok) {

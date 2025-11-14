@@ -34,6 +34,17 @@ interface LeagueGroup {
 // URL do serviço FastAPI de scraping (se configurado)
 const SCRAPER_SERVICE_URL = process.env.SCRAPER_SERVICE_URL || '';
 
+// Função auxiliar para criar AbortSignal com timeout (compatível com Node.js antigo)
+function createTimeoutSignal(timeoutMs: number): AbortSignal {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  // Limpa o timeout se o signal for abortado manualmente
+  controller.signal.addEventListener('abort', () => clearTimeout(timeoutId));
+  
+  return controller.signal;
+}
+
 // Função para fazer fetch do HTML do site usando o serviço FastAPI se disponível
 async function fetchSiteHTML(url: string): Promise<string> {
   try {
@@ -46,7 +57,7 @@ async function fetchSiteHTML(url: string): Promise<string> {
           headers: {
             'Content-Type': 'application/json',
           },
-          signal: AbortSignal.timeout(35000),
+          signal: createTimeoutSignal(35000),
         });
 
         if (scraperResponse.ok) {
@@ -87,7 +98,7 @@ async function fetchSiteHTML(url: string): Promise<string> {
         'Referer': 'https://www.google.com/',
       },
       redirect: 'follow',
-      signal: AbortSignal.timeout(30000),
+      signal: createTimeoutSignal(30000),
     });
 
     if (!response.ok) {

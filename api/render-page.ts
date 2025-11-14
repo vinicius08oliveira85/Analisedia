@@ -18,6 +18,17 @@ interface RenderResponse {
 // URL do serviço de renderização (pode ser configurada via env)
 const RENDERER_SERVICE_URL = process.env.RENDERER_SERVICE_URL || 'http://localhost:8000';
 
+// Função auxiliar para criar AbortSignal com timeout (compatível com Node.js antigo)
+function createTimeoutSignal(timeoutMs: number): AbortSignal {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  // Limpa o timeout se o signal for abortado manualmente
+  controller.signal.addEventListener('abort', () => clearTimeout(timeoutId));
+  
+  return controller.signal;
+}
+
 /**
  * Chama o serviço de renderização para obter HTML renderizado com JavaScript
  */
@@ -88,7 +99,7 @@ export default async function handler(
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
-            signal: AbortSignal.timeout(timeout || 30000),
+            signal: createTimeoutSignal(timeout || 30000),
           });
 
           if (!response.ok) {
