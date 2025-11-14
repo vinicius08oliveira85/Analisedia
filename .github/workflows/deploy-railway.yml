@@ -44,6 +44,8 @@ jobs:
           RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
         run: |
           echo "🚀 Iniciando deploy para Railway..."
+          echo "📋 Project ID: ${RAILWAY_PROJECT_ID:-não configurado}"
+          echo "📋 Service ID: ${RAILWAY_SERVICE_ID:-não configurado}"
           # Verifica se o token está configurado
           if [ -z "$RAILWAY_TOKEN" ] || [ "$RAILWAY_TOKEN" == "" ]; then
             echo "⚠️ Aviso: RAILWAY_TOKEN não está configurado nos secrets do GitHub"
@@ -71,17 +73,25 @@ jobs:
           else
             echo "⚠️ RAILWAY_SERVICE_ID não configurado. Tentando deploy sem especificar serviço..."
             echo "📝 Se houver múltiplos serviços, configure RAILWAY_SERVICE_ID nos secrets do GitHub"
+            echo ""
             echo "   Para obter o Service ID:"
-            echo "   1. Acesse seu projeto no Railway"
-            echo "   2. Vá em Settings do serviço"
-            echo "   3. O Service ID está na URL ou nas configurações"
+            echo "   1. Acesse: https://railway.app/project/3e8b514d-d2d2-4e3a-a61b-e66bcd1a7ed7"
+            echo "   2. Clique no serviço desejado (geralmente o serviço principal Node.js)"
+            echo "   3. Na URL do navegador, você verá:"
+            echo "      https://railway.app/project/3e8b514d-d2d2-4e3a-a61b-e66bcd1a7ed7/service/[SERVICE_ID]"
+            echo "   4. Copie o SERVICE_ID (parte após /service/)"
+            echo ""
             railway up || {
               echo "❌ Erro: Múltiplos serviços encontrados. Configure RAILWAY_SERVICE_ID nos secrets."
+              echo ""
               echo "📝 Para configurar:"
               echo "   1. Acesse: https://github.com/vinicius08oliveira85/Analisedia/settings/secrets/actions"
               echo "   2. Clique em 'New repository secret'"
               echo "   3. Nome: RAILWAY_SERVICE_ID"
               echo "   4. Valor: Cole o ID do serviço do Railway"
+              echo ""
+              echo "   O Service ID está na URL quando você acessa o serviço no Railway Dashboard:"
+              echo "   https://railway.app/project/3e8b514d-d2d2-4e3a-a61b-e66bcd1a7ed7/service/[SERVICE_ID]"
               exit 1
             }
           fi
