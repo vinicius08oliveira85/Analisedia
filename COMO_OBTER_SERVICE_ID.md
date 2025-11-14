@@ -10,14 +10,18 @@ Configure o secret `RAILWAY_SERVICE_ID` no GitHub.
 
 ### 1. Obter o Service ID no Railway
 
-**Opção A: Pela URL do serviço**
+**Opção A: Pela URL do serviço (MAIS FÁCIL) ⭐**
 1. Acesse seu projeto no Railway: https://railway.app/dashboard
-2. Clique no serviço que você quer fazer deploy
-3. Na URL do navegador, você verá algo como:
+2. Clique no serviço que você quer fazer deploy (geralmente o serviço principal Node.js)
+3. **Olhe a URL do navegador**, você verá algo como:
    ```
    https://railway.app/project/[PROJECT_ID]/service/[SERVICE_ID]
    ```
 4. O `SERVICE_ID` é a parte após `/service/`
+   
+   **Exemplo:**
+   - URL: `https://railway.app/project/3e8b514d-d2d2-4e3a-a61b-e66bcd1a7ed7/service/206f8221-8753-4f33-833b-01e9a1953d66`
+   - **SERVICE_ID**: `206f8221-8753-4f33-833b-01e9a1953d66`
 
 **Opção B: Pelo Railway CLI**
 1. Instale o Railway CLI: `npm install -g @railway/cli`
@@ -25,11 +29,11 @@ Configure o secret `RAILWAY_SERVICE_ID` no GitHub.
 3. Liste os serviços: `railway service`
 4. O Service ID será exibido na lista
 
-**Opção C: Pela interface do Railway**
+**Opção C: Pelos Logs do Railway**
 1. Acesse seu projeto no Railway
 2. Clique no serviço desejado
-3. Vá em **Settings**
-4. O Service ID pode estar visível nas configurações ou na URL
+3. Vá em **Deployments** → Clique em um deployment → **Logs**
+4. Procure por tags como: `"service": "206f8221-8753-4f33-833b-01e9a1953d66"`
 
 ### 2. Configurar no GitHub Secrets
 
