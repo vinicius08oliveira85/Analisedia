@@ -43,18 +43,25 @@ jobs:
         run: |
           echo "🚀 Iniciando deploy para Railway..."
           # Verifica se o token está configurado
-          if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "❌ Erro: RAILWAY_TOKEN não está configurado"
+          if [ -z "$RAILWAY_TOKEN" ] || [ "$RAILWAY_TOKEN" == "" ]; then
+            echo "⚠️ Aviso: RAILWAY_TOKEN não está configurado nos secrets do GitHub"
+            echo "📝 Para configurar:"
+            echo "   1. Acesse: https://github.com/vinicius08oliveira85/Analisedia/settings/secrets/actions"
+            echo "   2. Clique em 'New repository secret'"
+            echo "   3. Nome: RAILWAY_TOKEN"
+            echo "   4. Valor: Cole o token do Railway (obtenha em https://railway.app/dashboard)"
+            echo "❌ Deploy cancelado - configure o secret primeiro"
             exit 1
           fi
+          echo "✅ Token configurado, continuando deploy..."
           # Linka o projeto ao Railway (se necessário)
-          if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+          if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ] && [ "${{ secrets.RAILWAY_PROJECT_ID }}" != "" ]; then
             echo "Linking projeto: ${{ secrets.RAILWAY_PROJECT_ID }}"
             railway link ${{ secrets.RAILWAY_PROJECT_ID }} || true
           fi
           # Faz o deploy
           echo "Fazendo deploy..."
-          if [ -n "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then
+          if [ -n "${{ secrets.RAILWAY_SERVICE_ID }}" ] && [ "${{ secrets.RAILWAY_SERVICE_ID }}" != "" ]; then
             railway up --service ${{ secrets.RAILWAY_SERVICE_ID }}
           else
             railway up
