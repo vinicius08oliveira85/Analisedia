@@ -40,6 +40,8 @@ jobs:
       - name: Deploy para Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
         run: |
           echo "🚀 Iniciando deploy para Railway..."
           # Verifica se o token está configurado
@@ -54,17 +56,34 @@ jobs:
             exit 1
           fi
           echo "✅ Token configurado, continuando deploy..."
+          
           # Linka o projeto ao Railway (se necessário)
-          if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ] && [ "${{ secrets.RAILWAY_PROJECT_ID }}" != "" ]; then
-            echo "Linking projeto: ${{ secrets.RAILWAY_PROJECT_ID }}"
-            railway link ${{ secrets.RAILWAY_PROJECT_ID }} || true
+          if [ -n "$RAILWAY_PROJECT_ID" ] && [ "$RAILWAY_PROJECT_ID" != "" ]; then
+            echo "🔗 Linking projeto: $RAILWAY_PROJECT_ID"
+            railway link $RAILWAY_PROJECT_ID || true
           fi
+          
           # Faz o deploy
-          echo "Fazendo deploy..."
-          if [ -n "${{ secrets.RAILWAY_SERVICE_ID }}" ] && [ "${{ secrets.RAILWAY_SERVICE_ID }}" != "" ]; then
-            railway up --service ${{ secrets.RAILWAY_SERVICE_ID }}
+          echo "📦 Fazendo deploy..."
+          if [ -n "$RAILWAY_SERVICE_ID" ] && [ "$RAILWAY_SERVICE_ID" != "" ]; then
+            echo "🎯 Usando serviço específico: $RAILWAY_SERVICE_ID"
+            railway up --service $RAILWAY_SERVICE_ID
           else
-            railway up
+            echo "⚠️ RAILWAY_SERVICE_ID não configurado. Tentando deploy sem especificar serviço..."
+            echo "📝 Se houver múltiplos serviços, configure RAILWAY_SERVICE_ID nos secrets do GitHub"
+            echo "   Para obter o Service ID:"
+            echo "   1. Acesse seu projeto no Railway"
+            echo "   2. Vá em Settings do serviço"
+            echo "   3. O Service ID está na URL ou nas configurações"
+            railway up || {
+              echo "❌ Erro: Múltiplos serviços encontrados. Configure RAILWAY_SERVICE_ID nos secrets."
+              echo "📝 Para configurar:"
+              echo "   1. Acesse: https://github.com/vinicius08oliveira85/Analisedia/settings/secrets/actions"
+              echo "   2. Clique em 'New repository secret'"
+              echo "   3. Nome: RAILWAY_SERVICE_ID"
+              echo "   4. Valor: Cole o ID do serviço do Railway"
+              exit 1
+            }
           fi
           echo "✅ Deploy concluído com sucesso!"
 
