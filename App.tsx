@@ -155,6 +155,9 @@ const App: React.FC = () => {
                   e.stopPropagation();
                   setViewMode('list');
                 }}
+                onTouchStart={(e) => {
+                  e.stopPropagation();
+                }}
                 onTouchEnd={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -169,7 +172,9 @@ const App: React.FC = () => {
                   WebkitTapHighlightColor: 'transparent',
                   touchAction: 'manipulation',
                   userSelect: 'none',
-                  WebkitUserSelect: 'none'
+                  WebkitUserSelect: 'none',
+                  minHeight: '44px',
+                  minWidth: '44px'
                 }}
               >
                 Lista
@@ -180,6 +185,9 @@ const App: React.FC = () => {
                     e.preventDefault();
                     e.stopPropagation();
                     setViewMode('leagues');
+                  }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
                   }}
                   onTouchEnd={(e) => {
                     e.preventDefault();
@@ -195,7 +203,9 @@ const App: React.FC = () => {
                     WebkitTapHighlightColor: 'transparent',
                     touchAction: 'manipulation',
                     userSelect: 'none',
-                    WebkitUserSelect: 'none'
+                    WebkitUserSelect: 'none',
+                    minHeight: '44px',
+                    minWidth: '44px'
                   }}
                 >
                   Ligas ({leagues.length})
@@ -206,6 +216,9 @@ const App: React.FC = () => {
                   e.preventDefault();
                   e.stopPropagation();
                   setViewMode('config');
+                }}
+                onTouchStart={(e) => {
+                  e.stopPropagation();
                 }}
                 onTouchEnd={(e) => {
                   e.preventDefault();
@@ -221,7 +234,9 @@ const App: React.FC = () => {
                   WebkitTapHighlightColor: 'transparent',
                   touchAction: 'manipulation',
                   userSelect: 'none',
-                  WebkitUserSelect: 'none'
+                  WebkitUserSelect: 'none',
+                  minHeight: '44px',
+                  minWidth: '44px'
                 }}
               >
                 ⚙️ Configuração

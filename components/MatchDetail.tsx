@@ -145,13 +145,28 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
   return (
     <div>
         <button 
-            onClick={onBack}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onBack();
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+            }}
             onTouchEnd={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               onBack();
             }}
             className="mb-2 sm:mb-3 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white font-semibold py-1 px-2 sm:py-1.5 sm:px-3 rounded text-[10px] sm:text-xs transition-colors duration-200 flex items-center touch-manipulation"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
+            style={{ 
+              WebkitTapHighlightColor: 'transparent',
+              touchAction: 'manipulation',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              minHeight: '44px',
+              minWidth: '44px'
+            }}
         >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />

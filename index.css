@@ -29,6 +29,13 @@ button, a, [role="button"] {
   -webkit-user-select: none;
   -ms-user-select: none;
   -moz-user-select: none;
+  position: relative;
+  z-index: 1;
+}
+
+/* Garante que elementos clicáveis não sejam bloqueados */
+button:active, a:active, [role="button"]:active {
+  opacity: 0.8;
 }
 
 /* Melhora a área de toque em dispositivos móveis */
@@ -36,11 +43,18 @@ button, a, [role="button"] {
   button, a, [role="button"] {
     min-height: 44px;
     min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
   
-  /* Previne scroll acidental durante toques */
+  /* Previne scroll acidental durante toques, mas permite interação */
   * {
     -webkit-touch-callout: none;
+  }
+  
+  /* Garante que elementos interativos não sejam bloqueados */
+  button, a, [role="button"], input, select, textarea {
+    pointer-events: auto;
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
@@ -55,6 +69,11 @@ button, a, [role="button"] {
     -moz-user-select: text;
     -ms-user-select: text;
     user-select: text;
+  }
+  
+  /* Garante que overlays não bloqueiem toques em elementos interativos */
+  nav, [role="navigation"] {
+    pointer-events: auto;
   }
 }
 

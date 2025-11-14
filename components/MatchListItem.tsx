@@ -50,11 +50,14 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
     const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
     const deltaTime = Date.now() - touchStartRef.current.time;
 
-    // Se o movimento foi pequeno (< 10px) e rápido (< 300ms), considera como toque
-    if (deltaX < 10 && deltaY < 10 && deltaTime < 300) {
+    // Se o movimento foi pequeno (< 15px) e rápido (< 400ms), considera como toque
+    if (deltaX < 15 && deltaY < 15 && deltaTime < 400) {
       e.preventDefault();
       e.stopPropagation();
-      handleCardAction();
+      // Pequeno delay para garantir que o evento foi processado
+      setTimeout(() => {
+        handleCardAction();
+      }, 50);
     }
 
     touchStartRef.current = null;
