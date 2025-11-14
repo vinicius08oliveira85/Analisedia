@@ -2,7 +2,7 @@ import React from 'react';
 
 export const Header: React.FC = () => {
   return (
-    <header className="bg-gray-800 shadow-md sticky top-0 z-50">
+    <header className="bg-gray-800 shadow-md sticky top-0 z-50" style={{ pointerEvents: 'auto' }}>
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex items-center justify-between h-10 sm:h-12">
           <div className="flex items-center">

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import type { MatchDetails } from '../types';
 import { FavoriteButton } from './FavoriteButton';
 import { LiveStatusBadge } from './LiveStatusBadge';
@@ -11,86 +11,32 @@ interface MatchListItemProps {
 }
 
 export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, isFavorite, onToggleFavorite }) => {
-  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
-  const isTouchDevice = useRef(false);
-
   const handleFavoriteClick = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     e.preventDefault();
     onToggleFavorite(match.id);
   };
 
-  const handleCardAction = () => {
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const favoriteButton = target.closest('button[aria-label*="favorito"]');
+    if (favoriteButton) {
+      return;
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
     console.log('Card acionado, abrindo detalhes do match:', match.id);
     onClick();
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    isTouchDevice.current = true;
-    const touch = e.touches[0];
-    touchStartRef.current = {
-      x: touch.clientX,
-      y: touch.clientY,
-      time: Date.now()
-    };
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!touchStartRef.current) return;
-
-    const target = e.target as HTMLElement;
-    const favoriteButton = target.closest('button[aria-label*="favorito"]');
-    if (favoriteButton) {
-      touchStartRef.current = null;
-      return;
-    }
-
-    const touch = e.changedTouches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-    const deltaTime = Date.now() - touchStartRef.current.time;
-
-    // Se o movimento foi pequeno (< 15px) e rápido (< 400ms), considera como toque
-    if (deltaX < 15 && deltaY < 15 && deltaTime < 400) {
-      e.preventDefault();
-      e.stopPropagation();
-      // Pequeno delay para garantir que o evento foi processado
-      setTimeout(() => {
-        handleCardAction();
-      }, 50);
-    }
-
-    touchStartRef.current = null;
-  };
-
-  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // No mobile, ignora onClick se já foi tratado por touch (reset após 300ms)
-    if (isTouchDevice.current) {
-      setTimeout(() => {
-        isTouchDevice.current = false;
-      }, 300);
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    const target = e.target as HTMLElement;
-    const favoriteButton = target.closest('button[aria-label*="favorito"]');
-    if (favoriteButton) {
-      return;
-    }
-
-    handleCardAction();
   };
 
   const isLive = match.liveStatus?.isLive || false;
 
   return (
     <div 
-      onClick={handleClick}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      className={`bg-gray-800 rounded-md p-1.5 sm:p-2.5 cursor-pointer hover:bg-gray-700/70 active:bg-gray-700 transition-all duration-200 shadow border mb-1.5 touch-manipulation ${isFavorite ? 'border-yellow-400/50' : isLive ? 'border-red-500/50' : 'border-transparent hover:border-green-500'}`}
+      onClick={handleCardClick}
+      onTouchEnd={handleCardClick}
+      className={`bg-gray-800 rounded-md p-1.5 sm:p-2.5 cursor-pointer hover:bg-gray-700/70 active:bg-gray-700 transition-all duration-200 shadow border mb-1.5 ${isFavorite ? 'border-yellow-400/50' : isLive ? 'border-red-500/50' : 'border-transparent hover:border-green-500'}`}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -103,7 +49,9 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
         WebkitTapHighlightColor: 'transparent', 
         touchAction: 'manipulation',
         userSelect: 'none',
-        WebkitUserSelect: 'none'
+        WebkitUserSelect: 'none',
+        cursor: 'pointer',
+        minHeight: '44px'
       }}
     >
       <div className="flex items-center justify-between gap-1 sm:gap-2">

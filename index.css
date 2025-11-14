@@ -23,14 +23,15 @@ body {
 
 /* Melhorias para suporte mobile/touch */
 button, a, [role="button"] {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent !important;
+  touch-action: manipulation !important;
   user-select: none;
   -webkit-user-select: none;
   -ms-user-select: none;
   -moz-user-select: none;
   position: relative;
   z-index: 1;
+  cursor: pointer;
 }
 
 /* Garante que elementos clicáveis não sejam bloqueados */
@@ -40,21 +41,23 @@ button:active, a:active, [role="button"]:active {
 
 /* Melhora a área de toque em dispositivos móveis */
 @media (max-width: 640px) {
-  button, a, [role="button"] {
-    min-height: 44px;
-    min-width: 44px;
-    -webkit-tap-highlight-color: transparent;
+  html, body {
     touch-action: manipulation;
+    -webkit-touch-callout: none;
   }
   
-  /* Previne scroll acidental durante toques, mas permite interação */
-  * {
-    -webkit-touch-callout: none;
+  button, a, [role="button"] {
+    min-height: 44px !important;
+    min-width: 44px !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: manipulation !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
   }
   
   /* Garante que elementos interativos não sejam bloqueados */
   button, a, [role="button"], input, select, textarea {
-    pointer-events: auto;
+    pointer-events: auto !important;
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
@@ -71,9 +74,12 @@ button:active, a:active, [role="button"]:active {
     user-select: text;
   }
   
-  /* Garante que overlays não bloqueiem toques em elementos interativos */
-  nav, [role="navigation"] {
-    pointer-events: auto;
+  /* Garante que divs com role="button" sejam clicáveis */
+  div[role="button"] {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    cursor: pointer !important;
+    -webkit-tap-highlight-color: transparent !important;
   }
 }
 

@@ -150,9 +150,6 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
               e.stopPropagation();
               onBack();
             }}
-            onTouchStart={(e) => {
-              e.stopPropagation();
-            }}
             onTouchEnd={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -165,7 +162,9 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
               userSelect: 'none',
               WebkitUserSelect: 'none',
               minHeight: '44px',
-              minWidth: '44px'
+              minWidth: '44px',
+              cursor: 'pointer',
+              pointerEvents: 'auto'
             }}
         >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

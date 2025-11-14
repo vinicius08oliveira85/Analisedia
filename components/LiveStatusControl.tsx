@@ -35,15 +35,49 @@ export const LiveStatusControl: React.FC<LiveStatusControlProps> = ({
         <div className="flex gap-1 sm:gap-1.5">
           {isPolling ? (
             <button
-              onClick={onStop}
-              className="px-2 py-1 sm:px-2.5 sm:py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onStop();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onStop();
+              }}
+              className="px-2 py-1 sm:px-2.5 sm:py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
+              style={{
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation',
+                minHeight: '44px',
+                minWidth: '44px',
+                cursor: 'pointer',
+                pointerEvents: 'auto'
+              }}
             >
               Pausar
             </button>
           ) : (
             <button
-              onClick={onStart}
-              className="px-2 py-1 sm:px-2.5 sm:py-1 bg-green-600 hover:bg-green-700 text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onStart();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onStart();
+              }}
+              className="px-2 py-1 sm:px-2.5 sm:py-1 bg-green-600 hover:bg-green-700 text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
+              style={{
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation',
+                minHeight: '44px',
+                minWidth: '44px',
+                cursor: 'pointer',
+                pointerEvents: 'auto'
+              }}
             >
               Iniciar
             </button>

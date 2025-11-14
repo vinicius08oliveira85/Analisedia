@@ -23,12 +23,6 @@ export const Tabs: React.FC<TabsProps> = ({ activeTab, setActiveTab }) => {
     setActiveTab(tab);
   };
 
-  const handleTabTouch = (tab: Tab, e: React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setActiveTab(tab);
-  };
-
   return (
     <div className="bg-gray-800 rounded-t-md shadow-lg sticky top-10 sm:top-12 z-40">
       <nav className="flex overflow-x-auto scrollbar-hide -mb-px">
@@ -37,14 +31,16 @@ export const Tabs: React.FC<TabsProps> = ({ activeTab, setActiveTab }) => {
             key={tab}
             className={getTabClass(tab)}
             onClick={(e) => handleTabClick(tab, e)}
-            onTouchEnd={(e) => handleTabTouch(tab, e)}
+            onTouchEnd={(e) => handleTabClick(tab, e)}
             style={{ 
               WebkitTapHighlightColor: 'transparent',
               touchAction: 'manipulation',
               userSelect: 'none',
               WebkitUserSelect: 'none',
               minHeight: '44px',
-              minWidth: '44px'
+              minWidth: '44px',
+              cursor: 'pointer',
+              pointerEvents: 'auto'
             }}
           >
             {tab}

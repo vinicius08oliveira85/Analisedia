@@ -155,9 +155,6 @@ const App: React.FC = () => {
                   e.stopPropagation();
                   setViewMode('list');
                 }}
-                onTouchStart={(e) => {
-                  e.stopPropagation();
-                }}
                 onTouchEnd={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -168,13 +165,15 @@ const App: React.FC = () => {
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
-                style={{ 
+                  style={{ 
                   WebkitTapHighlightColor: 'transparent',
                   touchAction: 'manipulation',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   minHeight: '44px',
-                  minWidth: '44px'
+                  minWidth: '44px',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto'
                 }}
               >
                 Lista
@@ -200,13 +199,15 @@ const App: React.FC = () => {
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                   style={{ 
-                    WebkitTapHighlightColor: 'transparent',
-                    touchAction: 'manipulation',
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none',
-                    minHeight: '44px',
-                    minWidth: '44px'
-                  }}
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  minHeight: '44px',
+                  minWidth: '44px',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto'
+                }}
                 >
                   Ligas ({leagues.length})
                 </button>
@@ -230,13 +231,15 @@ const App: React.FC = () => {
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
-                style={{ 
+                  style={{ 
                   WebkitTapHighlightColor: 'transparent',
                   touchAction: 'manipulation',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                   minHeight: '44px',
-                  minWidth: '44px'
+                  minWidth: '44px',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto'
                 }}
               >
                 ⚙️ Configuração
