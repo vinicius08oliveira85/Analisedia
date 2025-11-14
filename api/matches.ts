@@ -395,11 +395,13 @@ function convertToMatchDetails(event: SportsEvent): MatchDetails {
   const dateStr = startDate.toLocaleDateString('pt-BR', { 
     day: '2-digit', 
     month: 'long', 
-    year: 'numeric' 
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo'
   });
   const timeStr = startDate.toLocaleTimeString('pt-BR', { 
     hour: '2-digit', 
-    minute: '2-digit' 
+    minute: '2-digit',
+    timeZone: 'America/Sao_Paulo'
   });
   
   // Extrai competição do location name

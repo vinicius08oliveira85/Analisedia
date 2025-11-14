@@ -1,4 +1,31 @@
 /**
+ * Formata data no formato brasileiro com fuso horário correto
+ */
+export function formatBrazilianDate(date: Date | string): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  return dateObj.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo'
+  });
+}
+
+/**
+ * Formata horário no formato brasileiro com fuso horário correto
+ */
+export function formatBrazilianTime(date: Date | string): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  return dateObj.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Sao_Paulo'
+  });
+}
+
+/**
  * Converte data no formato brasileiro para Date
  * Exemplo: "15 de janeiro de 2025" -> Date
  */

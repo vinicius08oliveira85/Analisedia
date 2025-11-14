@@ -63,7 +63,14 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
           <span className="font-semibold text-white truncate text-[11px] sm:text-xs">{match.teamA.name}</span>
         </div>
         <div className="text-center flex-shrink-0 px-1 sm:px-2">
-          <div className="font-bold text-xs sm:text-sm text-white">{match.matchInfo.time}</div>
+          {/* Mostra placar se estiver ao vivo, senão mostra horário */}
+          {match.liveStatus?.isLive && match.liveStatus?.homeScore !== undefined && match.liveStatus?.awayScore !== undefined ? (
+            <div className="font-bold text-sm sm:text-base text-white mb-0.5">
+              {match.liveStatus.homeScore} - {match.liveStatus.awayScore}
+            </div>
+          ) : (
+            <div className="font-bold text-xs sm:text-sm text-white">{match.matchInfo.time}</div>
+          )}
           <div className="text-[9px] sm:text-[10px] text-gray-400 truncate max-w-[70px] sm:max-w-none">{match.matchInfo.competition}</div>
           {/* Status ao vivo e odds */}
           <div className="mt-0.5 pointer-events-none">
