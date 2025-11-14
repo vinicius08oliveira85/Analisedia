@@ -150,9 +150,14 @@ const App: React.FC = () => {
           <>
             <div className="mb-1.5 flex gap-1 justify-end">
               <button
-                onClick={() => setViewMode('list')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setViewMode('list');
+                }}
                 onTouchEnd={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   setViewMode('list');
                 }}
                 className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors active:opacity-70 touch-manipulation ${
@@ -160,15 +165,25 @@ const App: React.FC = () => {
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
-                style={{ WebkitTapHighlightColor: 'transparent' }}
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none'
+                }}
               >
                 Lista
               </button>
               {leagues.length > 0 && (
                 <button
-                  onClick={() => setViewMode('leagues')}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setViewMode('leagues');
+                  }}
                   onTouchEnd={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     setViewMode('leagues');
                   }}
                   className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors active:opacity-70 touch-manipulation ${
@@ -176,15 +191,25 @@ const App: React.FC = () => {
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
+                  style={{ 
+                    WebkitTapHighlightColor: 'transparent',
+                    touchAction: 'manipulation',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none'
+                  }}
                 >
                   Ligas ({leagues.length})
                 </button>
               )}
               <button
-                onClick={() => setViewMode('config')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setViewMode('config');
+                }}
                 onTouchEnd={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   setViewMode('config');
                 }}
                 className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors active:opacity-70 touch-manipulation ${
@@ -192,7 +217,12 @@ const App: React.FC = () => {
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
-                style={{ WebkitTapHighlightColor: 'transparent' }}
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none'
+                }}
               >
                 ⚙️ Configuração
               </button>

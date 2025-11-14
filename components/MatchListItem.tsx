@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { MatchDetails } from '../types';
 import { FavoriteButton } from './FavoriteButton';
 import { LiveStatusBadge } from './LiveStatusBadge';
@@ -11,48 +11,82 @@ interface MatchListItemProps {
 }
 
 export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, isFavorite, onToggleFavorite }) => {
-  
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const isTouchDevice = useRef(false);
+
   const handleFavoriteClick = (e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation(); // Impede que o clique no botão de favorito acione o onClick do card principal
+    e.stopPropagation();
     e.preventDefault();
     onToggleFavorite(match.id);
   };
 
-  const handleCardClick = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    // Evita que clique no botão de favorito acione o onClick do card
-    const target = e.target as HTMLElement;
-    
-    // Verifica se o clique foi no botão de favorito ou em algum elemento dentro dele
-    const favoriteButton = target.closest('button[aria-label*="favorito"]');
-    if (favoriteButton) {
-      return; // O handleFavoriteClick já tratou isso
-    }
-    
-    // Chama o onClick para abrir os detalhes
-    console.log('Card clicado, abrindo detalhes do match:', match.id);
+  const handleCardAction = () => {
+    console.log('Card acionado, abrindo detalhes do match:', match.id);
     onClick();
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    // Previne scroll durante o toque
-    e.currentTarget.style.cursor = 'pointer';
+    isTouchDevice.current = true;
+    const touch = e.touches[0];
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now()
+    };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchStartRef.current) return;
+
+    const target = e.target as HTMLElement;
+    const favoriteButton = target.closest('button[aria-label*="favorito"]');
+    if (favoriteButton) {
+      touchStartRef.current = null;
+      return;
+    }
+
+    const touch = e.changedTouches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    const deltaTime = Date.now() - touchStartRef.current.time;
+
+    // Se o movimento foi pequeno (< 10px) e rápido (< 300ms), considera como toque
+    if (deltaX < 10 && deltaY < 10 && deltaTime < 300) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCardAction();
+    }
+
+    touchStartRef.current = null;
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // No mobile, ignora onClick se já foi tratado por touch (reset após 300ms)
+    if (isTouchDevice.current) {
+      setTimeout(() => {
+        isTouchDevice.current = false;
+      }, 300);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    const target = e.target as HTMLElement;
+    const favoriteButton = target.closest('button[aria-label*="favorito"]');
+    if (favoriteButton) {
+      return;
+    }
+
+    handleCardAction();
   };
 
   const isLive = match.liveStatus?.isLive || false;
 
   return (
     <div 
-      onClick={handleCardClick}
+      onClick={handleClick}
       onTouchStart={handleTouchStart}
-      onTouchEnd={(e) => {
-        const target = e.target as HTMLElement;
-        const favoriteButton = target.closest('button[aria-label*="favorito"]');
-        if (!favoriteButton) {
-          e.preventDefault();
-          e.stopPropagation();
-          handleCardClick(e);
-        }
-      }}
+      onTouchEnd={handleTouchEnd}
       className={`bg-gray-800 rounded-md p-1.5 sm:p-2.5 cursor-pointer hover:bg-gray-700/70 active:bg-gray-700 transition-all duration-200 shadow border mb-1.5 touch-manipulation ${isFavorite ? 'border-yellow-400/50' : isLive ? 'border-red-500/50' : 'border-transparent hover:border-green-500'}`}
       role="button"
       tabIndex={0}
@@ -62,7 +96,12 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
           onClick();
         }
       }}
-      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+      style={{ 
+        WebkitTapHighlightColor: 'transparent', 
+        touchAction: 'manipulation',
+        userSelect: 'none',
+        WebkitUserSelect: 'none'
+      }}
     >
       <div className="flex items-center justify-between gap-1 sm:gap-2">
         <div className="flex items-center gap-1 sm:gap-1.5 flex-1 min-w-0">
