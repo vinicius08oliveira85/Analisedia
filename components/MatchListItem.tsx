@@ -14,14 +14,22 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
   
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Impede que o clique no botão de favorito acione o onClick do card principal
+    e.preventDefault();
     onToggleFavorite(match.id);
   };
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    // Evita que clique em elementos filhos acione o onClick do card
-    if ((e.target as HTMLElement).closest('button')) {
-      return;
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Evita que clique no botão de favorito acione o onClick do card
+    const target = e.target as HTMLElement;
+    
+    // Verifica se o clique foi no botão de favorito ou em algum elemento dentro dele
+    const favoriteButton = target.closest('button[aria-label*="favorito"]');
+    if (favoriteButton) {
+      return; // O handleFavoriteClick já tratou isso
     }
+    
+    // Chama o onClick para abrir os detalhes
+    console.log('Card clicado, abrindo detalhes do match:', match.id);
     onClick();
   };
 

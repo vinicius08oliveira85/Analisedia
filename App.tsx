@@ -94,12 +94,18 @@ const App: React.FC = () => {
   };
 
   const handleSelectMatch = (matchId: string) => {
+    console.log('handleSelectMatch chamado com matchId:', matchId);
+    console.log('todayMatches:', todayMatches.length, 'matches:', matches.length);
+    
     // Busca primeiro nos jogos filtrados, depois em todos
     const match = todayMatches.find(m => m.id === matchId) || matches.find(m => m.id === matchId);
+    
     if (match) {
+      console.log('Match encontrado:', match.teamA.name, 'vs', match.teamB.name);
       setSelectedMatch(match);
     } else {
       console.warn('Jogo não encontrado:', matchId);
+      console.warn('IDs disponíveis:', todayMatches.map(m => m.id), matches.map(m => m.id));
     }
   };
 
