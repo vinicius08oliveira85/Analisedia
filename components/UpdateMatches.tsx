@@ -159,28 +159,52 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
         <div className="flex flex-wrap gap-1 sm:gap-1.5">
           <button
             onClick={() => setShowUrlInput(!showUrlInput)}
+            onTouchEnd={(e) => {
+              if (!isUpdating) {
+                e.preventDefault();
+                setShowUrlInput(!showUrlInput);
+              }
+            }}
             disabled={isUpdating}
-            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
+            className="px-3 py-2 sm:px-2 sm:py-1 sm:px-3 sm:py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
+            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
             title="Importar partidas através de uma URL customizada"
           >
             {showUrlInput ? '✕' : '🔗 URL'}
           </button>
           <button
             onClick={handleScrapeSite}
+            onTouchEnd={(e) => {
+              if (!isUpdating) {
+                e.preventDefault();
+                handleScrapeSite();
+              }
+            }}
             disabled={isUpdating}
-            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
+            className="px-3 py-2 sm:px-2 sm:py-1 sm:px-3 sm:py-1.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
+            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
             title="Faz scraping direto do site academiadasapostasbrasil.com"
           >
             {isUpdating ? '...' : '🔄 Site'}
           </button>
           <button
             onClick={handlePasteHTML}
+            onTouchEnd={(e) => {
+              if (!isUpdating) {
+                e.preventDefault();
+                handlePasteHTML();
+              }
+            }}
             disabled={isUpdating}
-            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors"
+            className="px-3 py-2 sm:px-2 sm:py-1 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
+            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
           >
             {isUpdating ? '...' : '📋 HTML'}
           </button>
-          <label className="px-2 py-1 sm:px-3 sm:py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors cursor-pointer">
+          <label 
+            className="px-3 py-2 sm:px-2 sm:py-1 sm:px-3 sm:py-1.5 bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors cursor-pointer touch-manipulation inline-block"
+            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          >
             {isUpdating ? '...' : '📁 File'}
             <input
               ref={fileInputRef}
@@ -214,13 +238,20 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
                 }
               }}
             />
-            <button
-              onClick={handleScrapeFromCustomURL}
-              disabled={isUpdating || !customUrl.trim()}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-xs sm:text-sm font-medium transition-colors"
-            >
-              {isUpdating ? 'Processando...' : 'Importar'}
-            </button>
+                <button
+                  onClick={handleScrapeFromCustomURL}
+                  onTouchEnd={(e) => {
+                    if (!isUpdating && customUrl.trim()) {
+                      e.preventDefault();
+                      handleScrapeFromCustomURL();
+                    }
+                  }}
+                  disabled={isUpdating || !customUrl.trim()}
+                  className="px-4 py-3 sm:py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-xs sm:text-sm font-medium transition-colors touch-manipulation"
+                  style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+                >
+                  {isUpdating ? 'Processando...' : 'Importar'}
+                </button>
           </div>
           <p className="text-gray-400 text-xs mt-2">
             💡 Suporta: academiadasapostasbrasil.com

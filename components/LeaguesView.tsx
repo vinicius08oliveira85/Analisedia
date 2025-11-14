@@ -55,7 +55,12 @@ export const LeaguesView: React.FC<LeaguesViewProps> = ({
           <div key={league.leagueName} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
             <button
               onClick={() => toggleLeague(league.leagueName)}
-              className="w-full px-2 sm:px-3 py-2 sm:py-2.5 bg-gray-700 hover:bg-gray-600 transition-colors flex items-center justify-between"
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                toggleLeague(league.leagueName);
+              }}
+              className="w-full px-2 sm:px-3 py-3 sm:py-2.5 bg-gray-700 hover:bg-gray-600 active:bg-gray-500 transition-colors flex items-center justify-between touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
             >
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <span className="text-xs sm:text-sm font-bold text-white">{league.leagueName}</span>
