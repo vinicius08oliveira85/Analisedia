@@ -39,19 +39,19 @@ export const MatchList: React.FC<MatchListProps> = ({ matches, onSelectMatch, fa
   }
 
   return (
-    <div>
+    <div style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}>
       <h2 className="text-sm sm:text-base font-bold text-green-400 mb-3 sm:mb-4 text-center">Jogos do Dia</h2>
       
       {favoritedMatches.length > 0 && (
-        <div className="mb-3 sm:mb-4">
+        <div className="mb-3 sm:mb-4" style={{ pointerEvents: 'auto' }}>
           <h3 className="text-xs sm:text-sm font-semibold text-yellow-400 mb-2 sm:mb-2.5 border-b-2 border-yellow-400/30 pb-1 sm:pb-1.5">Favoritos</h3>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5" style={{ pointerEvents: 'auto' }}>
             {renderMatchList(favoritedMatches)}
           </div>
         </div>
       )}
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" style={{ pointerEvents: 'auto' }}>
         {renderMatchList(otherMatches)}
       </div>
     </div>

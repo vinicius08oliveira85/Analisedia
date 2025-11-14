@@ -51,7 +51,10 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
         userSelect: 'none',
         WebkitUserSelect: 'none',
         cursor: 'pointer',
-        minHeight: '44px'
+        minHeight: '44px',
+        pointerEvents: 'auto',
+        position: 'relative',
+        zIndex: 1
       }}
     >
       <div className="flex items-center justify-between gap-1 sm:gap-2">

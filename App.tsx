@@ -75,9 +75,15 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Could not save matches to localStorage", error);
     }
-    setMatches(filteredMatches.length > 0 ? filteredMatches : allMatchesData);
-    setSelectedMatch(null); // Volta para a lista
-    setViewMode('list'); // Volta para a visualização de lista após importar
+    
+    // Atualiza o estado e volta para a lista
+    // Usa setTimeout para garantir que o DOM esteja pronto antes de permitir interações
+    setSelectedMatch(null);
+    setViewMode('list');
+    // Atualiza matches após um pequeno delay para garantir que a UI esteja pronta
+    setTimeout(() => {
+      setMatches(filteredMatches.length > 0 ? filteredMatches : allMatchesData);
+    }, 0);
   };
 
   const handleLeaguesUpdated = (updatedLeagues: Array<{ leagueName: string; matches: MatchDetails[] }>) => {
@@ -275,12 +281,14 @@ const App: React.FC = () => {
             onToggleFavorite={handleToggleFavorite}
           />
         ) : (
-          <MatchList 
-            matches={todayMatches} 
-            onSelectMatch={handleSelectMatch}
-            favorites={favorites}
-            onToggleFavorite={handleToggleFavorite}
-          />
+          <div style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}>
+            <MatchList 
+              matches={todayMatches} 
+              onSelectMatch={handleSelectMatch}
+              favorites={favorites}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          </div>
         )}
       </main>
       <footer className="text-center py-1 text-gray-500 text-[10px] sm:text-xs">
