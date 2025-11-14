@@ -33,14 +33,25 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
     onClick();
   };
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    // Previne scroll durante o toque
+    e.currentTarget.style.cursor = 'pointer';
+  };
+
   const isLive = match.liveStatus?.isLive || false;
 
   return (
     <div 
       onClick={handleCardClick}
+      onTouchStart={handleTouchStart}
       onTouchEnd={(e) => {
-        e.preventDefault();
-        handleCardClick(e);
+        const target = e.target as HTMLElement;
+        const favoriteButton = target.closest('button[aria-label*="favorito"]');
+        if (!favoriteButton) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleCardClick(e);
+        }
       }}
       className={`bg-gray-800 rounded-md p-1.5 sm:p-2.5 cursor-pointer hover:bg-gray-700/70 active:bg-gray-700 transition-all duration-200 shadow border mb-1.5 touch-manipulation ${isFavorite ? 'border-yellow-400/50' : isLive ? 'border-red-500/50' : 'border-transparent hover:border-green-500'}`}
       role="button"
@@ -51,7 +62,7 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
           onClick();
         }
       }}
-      style={{ WebkitTapHighlightColor: 'transparent' }}
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
     >
       <div className="flex items-center justify-between gap-1 sm:gap-2">
         <div className="flex items-center gap-1 sm:gap-1.5 flex-1 min-w-0">

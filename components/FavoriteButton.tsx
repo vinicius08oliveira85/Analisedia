@@ -6,16 +6,23 @@ interface FavoriteButtonProps {
 }
 
 export const FavoriteButton: React.FC<FavoriteButtonProps> = ({ isFavorite, onClick }) => {
+  const handleClick = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onClick(e);
+  };
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       onTouchEnd={(e) => {
+        e.stopPropagation();
         e.preventDefault();
         onClick(e);
       }}
       aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
       className="p-1 sm:p-1.5 rounded-full hover:bg-gray-700/50 active:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors duration-200 touch-manipulation"
-      style={{ WebkitTapHighlightColor: 'transparent', minWidth: '44px', minHeight: '44px' }}
+      style={{ WebkitTapHighlightColor: 'transparent' }}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

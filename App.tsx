@@ -155,12 +155,12 @@ const App: React.FC = () => {
                   e.preventDefault();
                   setViewMode('list');
                 }}
-                className={`px-3 py-2 sm:px-2 sm:py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation active:opacity-70 ${
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors active:opacity-70 touch-manipulation ${
                   viewMode === 'list'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
-                style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
                 Lista
               </button>
@@ -171,12 +171,12 @@ const App: React.FC = () => {
                     e.preventDefault();
                     setViewMode('leagues');
                   }}
-                  className={`px-3 py-2 sm:px-2 sm:py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation active:opacity-70 ${
+                  className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors active:opacity-70 touch-manipulation ${
                     viewMode === 'leagues'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
-                  style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   Ligas ({leagues.length})
                 </button>
@@ -187,12 +187,12 @@ const App: React.FC = () => {
                   e.preventDefault();
                   setViewMode('config');
                 }}
-                className={`px-3 py-2 sm:px-2 sm:py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation active:opacity-70 ${
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors active:opacity-70 touch-manipulation ${
                   viewMode === 'config'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
-                style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
                 ⚙️ Configuração
               </button>

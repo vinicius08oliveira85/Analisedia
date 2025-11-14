@@ -21,15 +21,17 @@ body {
   min-height: 100vh;
 }
 
-/* Melhorias para dispositivos móveis */
+/* Melhorias para suporte mobile/touch */
 button, a, [role="button"] {
-  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-/* Área mínima de toque para elementos interativos em mobile */
+/* Melhora a área de toque em dispositivos móveis */
 @media (max-width: 640px) {
-  button, a, [role="button"], label[for] {
+  button, a, [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }

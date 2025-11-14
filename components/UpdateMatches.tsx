@@ -166,9 +166,9 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
               }
             }}
             disabled={isUpdating}
-            className="px-3 py-2 sm:px-2 sm:py-1 sm:px-3 sm:py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
-            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
             title="Importar partidas através de uma URL customizada"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             {showUrlInput ? '✕' : '🔗 URL'}
           </button>
@@ -181,9 +181,9 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
               }
             }}
             disabled={isUpdating}
-            className="px-3 py-2 sm:px-2 sm:py-1 sm:px-3 sm:py-1.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
-            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
             title="Faz scraping direto do site academiadasapostasbrasil.com"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             {isUpdating ? '...' : '🔄 Site'}
           </button>
@@ -196,15 +196,12 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
               }
             }}
             disabled={isUpdating}
-            className="px-3 py-2 sm:px-2 sm:py-1 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
-            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+            className="px-2 py-1 sm:px-3 sm:py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors touch-manipulation"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             {isUpdating ? '...' : '📋 HTML'}
           </button>
-          <label 
-            className="px-3 py-2 sm:px-2 sm:py-1 sm:px-3 sm:py-1.5 bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors cursor-pointer touch-manipulation inline-block"
-            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-          >
+          <label className="px-2 py-1 sm:px-3 sm:py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-[10px] sm:text-xs font-medium transition-colors cursor-pointer">
             {isUpdating ? '...' : '📁 File'}
             <input
               ref={fileInputRef}
@@ -247,8 +244,8 @@ export const UpdateMatches: React.FC<UpdateMatchesProps> = ({ onMatchesUpdated, 
                     }
                   }}
                   disabled={isUpdating || !customUrl.trim()}
-                  className="px-4 py-3 sm:py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-xs sm:text-sm font-medium transition-colors touch-manipulation"
-                  style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-md text-xs sm:text-sm font-medium transition-colors touch-manipulation"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   {isUpdating ? 'Processando...' : 'Importar'}
                 </button>

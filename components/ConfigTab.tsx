@@ -68,12 +68,12 @@ export const ConfigTab: React.FC<ConfigTabProps> = ({ onMatchesUpdated, onLeague
               }
             }}
             disabled={isScraping}
-            className={`px-3 py-2 sm:px-4 sm:py-2 rounded-md text-[10px] sm:text-xs font-medium transition-colors touch-manipulation active:opacity-70 ${
+            className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-[10px] sm:text-xs font-medium transition-colors touch-manipulation ${
               autoScrapingEnabled
-                ? 'bg-green-600 hover:bg-green-700 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                ? 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-gray-300'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
-            style={{ WebkitTapHighlightColor: 'transparent', minHeight: '44px' }}
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             {isScraping ? 'Atualizando...' : autoScrapingEnabled ? '⏸️ Pausar' : '▶️ Iniciar'}
           </button>
