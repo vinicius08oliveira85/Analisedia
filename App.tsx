@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { MatchList } from './components/MatchList';
 import { MatchDetail } from './components/MatchDetail';
-import { UpdateMatches } from './components/UpdateMatches';
+import { ConfigTab } from './components/ConfigTab';
 import { LiveStatusControl } from './components/LiveStatusControl';
 import { LeaguesView } from './components/LeaguesView';
 import { useLiveStatusPolling } from './hooks/useLiveStatusPolling';
@@ -14,7 +14,7 @@ const App: React.FC = () => {
   const [matches, setMatches] = useState<MatchDetails[]>(allMatchesData);
   const [selectedMatch, setSelectedMatch] = useState<MatchDetails | null>(null);
   const [leagues, setLeagues] = useState<Array<{ leagueName: string; matches: MatchDetails[] }>>([]);
-  const [viewMode, setViewMode] = useState<'list' | 'leagues'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'leagues' | 'config'>('list');
   const [favorites, setFavorites] = useState<string[]>(() => {
     try {
       const savedFavorites = window.localStorage.getItem('favoriteMatches');
@@ -77,6 +77,7 @@ const App: React.FC = () => {
     }
     setMatches(filteredMatches.length > 0 ? filteredMatches : allMatchesData);
     setSelectedMatch(null); // Volta para a lista
+    setViewMode('list'); // Volta para a visualização de lista após importar
   };
 
   const handleLeaguesUpdated = (updatedLeagues: Array<{ leagueName: string; matches: MatchDetails[] }>) => {
@@ -90,6 +91,8 @@ const App: React.FC = () => {
     // Se há ligas, muda para visualização por ligas
     if (filteredLeagues.length > 0) {
       setViewMode('leagues');
+    } else {
+      setViewMode('list');
     }
   };
 
@@ -145,22 +148,18 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-1.5 sm:px-3 lg:px-6 py-1.5 sm:py-3">
         {!selectedMatch && (
           <>
-            <UpdateMatches 
-              onMatchesUpdated={handleMatchesUpdated} 
-              onLeaguesUpdated={handleLeaguesUpdated}
-            />
-            {leagues.length > 0 && (
-              <div className="mb-1.5 flex gap-1 justify-end">
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  Lista
-                </button>
+            <div className="mb-1.5 flex gap-1 justify-end">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                Lista
+              </button>
+              {leagues.length > 0 && (
                 <button
                   onClick={() => setViewMode('leagues')}
                   className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
@@ -171,14 +170,26 @@ const App: React.FC = () => {
                 >
                   Ligas ({leagues.length})
                 </button>
-              </div>
+              )}
+              <button
+                onClick={() => setViewMode('config')}
+                className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors ${
+                  viewMode === 'config'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                ⚙️ Configuração
+              </button>
+            </div>
+            {viewMode !== 'config' && (
+              <LiveStatusControl
+                isPolling={isPolling}
+                onStart={startPolling}
+                onStop={stopPolling}
+                liveMatchesCount={liveMatches.length}
+              />
             )}
-            <LiveStatusControl
-              isPolling={isPolling}
-              onStart={startPolling}
-              onStop={stopPolling}
-              liveMatchesCount={liveMatches.length}
-            />
           </>
         )}
         {selectedMatch ? (
@@ -187,6 +198,11 @@ const App: React.FC = () => {
             onBack={handleBackToList}
             isFavorite={favorites.includes(selectedMatch.id)}
             onToggleFavorite={handleToggleFavorite}
+          />
+        ) : viewMode === 'config' ? (
+          <ConfigTab
+            onMatchesUpdated={handleMatchesUpdated}
+            onLeaguesUpdated={handleLeaguesUpdated}
           />
         ) : viewMode === 'leagues' && leagues.length > 0 ? (
           <LeaguesView
