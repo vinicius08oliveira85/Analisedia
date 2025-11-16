@@ -307,7 +307,8 @@ const App: React.FC = () => {
               onToggleFavorite={handleToggleFavorite}
             />
           </div>
-        )}
+        );
+        })()}
       </main>
       <footer className="text-center py-1 text-gray-500 text-[10px] sm:text-xs">
         <p>Futibou Analytics</p>
