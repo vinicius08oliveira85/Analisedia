@@ -106,6 +106,9 @@ const App: React.FC = () => {
     console.log('handleSelectMatch chamado com matchId:', matchId);
     console.log('todayMatches:', todayMatches.length, 'matches:', matches.length);
     
+    // Primeiro, limpa a seleção anterior e o viewMode
+    setViewMode('list');
+    
     // Busca primeiro nos jogos filtrados, depois em todos
     const match = todayMatches.find(m => m.id === matchId) || matches.find(m => m.id === matchId);
     
@@ -113,7 +116,9 @@ const App: React.FC = () => {
       console.log('Match encontrado:', match.teamA.name, 'vs', match.teamB.name);
       setSelectedMatch(match);
       // Scroll suave para o topo quando abrir os detalhes
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
     } else {
       console.warn('Jogo não encontrado:', matchId);
       console.warn('IDs disponíveis:', todayMatches.map(m => m.id), matches.map(m => m.id));
@@ -159,7 +164,6 @@ const App: React.FC = () => {
             <div className="mb-1.5 flex gap-1 justify-end">
               <button
                 onClick={(e) => {
-                  e.preventDefault();
                   e.stopPropagation();
                   setViewMode('list');
                 }}
@@ -189,7 +193,6 @@ const App: React.FC = () => {
               {leagues.length > 0 && (
                 <button
                   onClick={(e) => {
-                    e.preventDefault();
                     e.stopPropagation();
                     setViewMode('leagues');
                   }}
@@ -222,8 +225,8 @@ const App: React.FC = () => {
               )}
               <button
                 onClick={(e) => {
-                  e.preventDefault();
                   e.stopPropagation();
+                  console.log('Botão Configuração clicado');
                   setViewMode('config');
                 }}
                 onTouchStart={(e) => {
@@ -232,6 +235,7 @@ const App: React.FC = () => {
                 onTouchEnd={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  console.log('Botão Configuração tocado');
                   setViewMode('config');
                 }}
                 className={`px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium transition-colors active:opacity-70 touch-manipulation ${
@@ -247,7 +251,9 @@ const App: React.FC = () => {
                   minHeight: '44px',
                   minWidth: '44px',
                   cursor: 'pointer',
-                  pointerEvents: 'auto'
+                  pointerEvents: 'auto',
+                  position: 'relative',
+                  zIndex: 10
                 }}
               >
                 ⚙️ Configuração

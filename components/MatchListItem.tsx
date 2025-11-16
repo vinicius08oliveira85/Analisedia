@@ -24,13 +24,10 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
       return;
     }
     
-    e.preventDefault();
+    // Não previne o comportamento padrão para permitir que o evento seja processado
     e.stopPropagation();
     console.log('Card acionado, abrindo detalhes do match:', match.id);
-    // Pequeno delay para garantir que o evento foi processado corretamente
-    setTimeout(() => {
-      onClick();
-    }, 100);
+    onClick();
   };
 
   const isLive = match.liveStatus?.isLive || false;
@@ -38,7 +35,22 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
   return (
     <div 
       onClick={handleCardClick}
-      onTouchEnd={handleCardClick}
+      onTouchStart={(e) => {
+        // Previne scroll durante o toque
+        const target = e.target as HTMLElement;
+        const favoriteButton = target.closest('button[aria-label*="favorito"]');
+        if (!favoriteButton) {
+          e.stopPropagation();
+        }
+      }}
+      onTouchEnd={(e) => {
+        const target = e.target as HTMLElement;
+        const favoriteButton = target.closest('button[aria-label*="favorito"]');
+        if (!favoriteButton) {
+          e.preventDefault();
+          handleCardClick(e);
+        }
+      }}
       className={`bg-gray-800 rounded-md p-1.5 sm:p-2.5 cursor-pointer hover:bg-gray-700/70 active:bg-gray-700 transition-all duration-200 shadow border mb-1.5 ${isFavorite ? 'border-yellow-400/50' : isLive ? 'border-red-500/50' : 'border-transparent hover:border-green-500'}`}
       role="button"
       tabIndex={0}

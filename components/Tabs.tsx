@@ -20,12 +20,13 @@ export const Tabs: React.FC<TabsProps> = ({ activeTab, setActiveTab }) => {
   const handleTabClick = (tab: Tab, e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('Tab clicada:', tab);
     setActiveTab(tab);
   };
 
   return (
-    <div className="bg-gray-800 rounded-t-md shadow-lg sticky top-10 sm:top-12 z-40">
-      <nav className="flex overflow-x-auto scrollbar-hide -mb-px">
+    <div className="bg-gray-800 rounded-t-md shadow-lg sticky top-10 sm:top-12 z-40" style={{ pointerEvents: 'auto' }}>
+      <nav className="flex overflow-x-auto scrollbar-hide -mb-px" style={{ pointerEvents: 'auto' }}>
         {TABS.map(tab => (
           <button
             key={tab}
@@ -40,7 +41,9 @@ export const Tabs: React.FC<TabsProps> = ({ activeTab, setActiveTab }) => {
               minHeight: '44px',
               minWidth: '44px',
               cursor: 'pointer',
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              position: 'relative',
+              zIndex: 41
             }}
           >
             {tab}
