@@ -24,7 +24,7 @@ async function fetchSiteHTML(url: string): Promise<string> {
     // Se o serviço FastAPI estiver configurado, usa ele primeiro
     if (SCRAPER_SERVICE_URL) {
       try {
-        console.log('Tentando usar serviço FastAPI de scraping...');
+        console.log(`Tentando usar serviço FastAPI de scraping: ${SCRAPER_SERVICE_URL}`);
         const scraperResponse = await fetch(`${SCRAPER_SERVICE_URL}/scrape?url=${encodeURIComponent(url)}`, {
           method: 'GET',
           headers: {
@@ -36,20 +36,24 @@ async function fetchSiteHTML(url: string): Promise<string> {
         if (scraperResponse.ok) {
           const scraperData = await scraperResponse.json();
           if (scraperData.success && scraperData.html) {
-            console.log('✅ HTML obtido via serviço FastAPI');
+            console.log('✅ HTML obtido via serviço FastAPI, tamanho:', scraperData.html.length);
             return scraperData.html;
           } else {
-            console.warn('Serviço FastAPI retornou erro:', scraperData.message);
+            console.warn('Serviço FastAPI retornou erro:', scraperData.message || scraperData.error);
             // Continua para tentar método direto
           }
         } else {
-          console.warn('Serviço FastAPI não disponível, tentando método direto...');
+          const errorText = await scraperResponse.text().catch(() => 'Erro desconhecido');
+          console.warn(`Serviço FastAPI retornou status ${scraperResponse.status}:`, errorText);
           // Continua para tentar método direto
         }
       } catch (scraperError) {
-        console.warn('Erro ao usar serviço FastAPI, tentando método direto:', scraperError);
+        const errorMsg = scraperError instanceof Error ? scraperError.message : String(scraperError);
+        console.warn('Erro ao usar serviço FastAPI, tentando método direto:', errorMsg);
         // Continua para tentar método direto
       }
+    } else {
+      console.log('SCRAPER_SERVICE_URL não configurado, usando método direto');
     }
 
     // Método direto (fallback)
@@ -75,15 +79,32 @@ async function fetchSiteHTML(url: string): Promise<string> {
     });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Erro desconhecido');
+      console.error(`Erro HTTP ${response.status} ao fazer fetch:`, errorText.substring(0, 500));
+      
       if (response.status === 403) {
         throw new Error(`Acesso negado (403): O site está bloqueando requisições automáticas. Cole o HTML manualmente ou use a URL diretamente.`);
       }
-      throw new Error(`HTTP error! status: ${response.status}`);
+      
+      if (response.status === 404) {
+        throw new Error(`Página não encontrada (404): A URL do jogo pode estar incorreta ou o jogo pode ter sido removido.`);
+      }
+      
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText.substring(0, 200)}`);
     }
 
-    return await response.text();
+    const html = await response.text();
+    console.log(`✅ HTML obtido via método direto, tamanho: ${html.length} bytes`);
+    return html;
   } catch (error) {
-    console.error('Erro ao fazer fetch do site:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('Erro ao fazer fetch do site:', errorMsg);
+    
+    // Se for erro de abort (timeout), relança com mensagem mais clara
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Timeout: A requisição demorou muito para responder. O site pode estar lento ou bloqueando requisições.');
+    }
+    
     throw error;
   }
 }
@@ -148,9 +169,32 @@ export default async function handler(
 
     } catch (error) {
       console.error('Erro ao fazer scraping dos detalhes:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      // Se for erro 403, retorna mensagem mais específica
+      if (errorMessage.includes('403') || errorMessage.includes('Acesso negado')) {
+        return res.status(403).json({ 
+          error: 'Acesso negado pelo site',
+          details: 'O site está bloqueando requisições automáticas. Use a aba "Configurações" para colar o HTML manualmente ou fazer upload do arquivo.',
+          message: 'Para obter os detalhes, você pode:\n1. Acessar a URL do jogo no navegador\n2. Copiar o HTML da página\n3. Colar na aba "Configurações" do jogo'
+        });
+      }
+      
+      // Se for timeout, retorna erro específico
+      if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
+        return res.status(504).json({ 
+          error: 'Timeout ao fazer scraping',
+          details: 'A requisição demorou muito para responder. Tente novamente ou use a opção de colar HTML manualmente.',
+          message: errorMessage
+        });
+      }
+      
       return res.status(500).json({ 
         error: 'Erro ao fazer scraping dos detalhes do jogo',
-        details: error instanceof Error ? error.message : 'Erro desconhecido'
+        details: errorMessage,
+        message: errorMessage,
+        stack: process.env.NODE_ENV === 'development' ? errorStack : undefined
       });
     }
   }

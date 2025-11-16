@@ -74,7 +74,21 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
           setCurrentMatch(updatedMatch);
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar detalhes';
+        let errorMessage = 'Erro ao carregar detalhes';
+        
+        if (error instanceof Error) {
+          errorMessage = error.message;
+          
+          // Melhora mensagens de erro comuns
+          if (errorMessage.includes('403') || errorMessage.includes('Acesso negado')) {
+            errorMessage = 'O site está bloqueando requisições automáticas. Use a aba "Configurações" para colar o HTML manualmente.';
+          } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+            errorMessage = 'A requisição demorou muito. Tente novamente ou use a opção de colar HTML manualmente na aba "Configurações".';
+          } else if (errorMessage.includes('404')) {
+            errorMessage = 'Página não encontrada. A URL do jogo pode estar incorreta.';
+          }
+        }
+        
         setDetailsError(errorMessage);
         console.error('Erro ao carregar detalhes automaticamente:', error);
       } finally {
@@ -187,11 +201,17 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
         )}
         {detailsError && (
           <div className="bg-yellow-900/50 border border-yellow-700 rounded-lg p-2 sm:p-3 mb-2 sm:mb-3">
-            <p className="text-yellow-200 text-[10px] sm:text-xs">
-              ⚠️ Erro ao carregar: {detailsError}
+            <p className="text-yellow-200 text-[10px] sm:text-xs font-semibold mb-1">
+              ⚠️ Erro ao carregar detalhes automaticamente
             </p>
-            <p className="text-yellow-300 text-[9px] sm:text-[10px] mt-0.5">
-              Use a aba "Configurações" para atualizar manualmente.
+            <p className="text-yellow-200 text-[10px] sm:text-xs mb-2">
+              {detailsError}
+            </p>
+            <p className="text-yellow-300 text-[9px] sm:text-[10px] mt-1 border-t border-yellow-700/50 pt-1.5">
+              💡 <strong>Solução:</strong> Acesse a aba "Configurações" para:
+              <br />• Colar o HTML da página manualmente
+              <br />• Fazer upload de um arquivo HTML
+              <br />• Atualizar os detalhes do jogo
             </p>
           </div>
         )}
