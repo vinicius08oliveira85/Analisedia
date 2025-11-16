@@ -76,14 +76,34 @@ const App: React.FC = () => {
       console.error("Could not save matches to localStorage", error);
     }
     
-    // Atualiza o estado e volta para a lista
-    // Usa setTimeout para garantir que o DOM esteja pronto antes de permitir interações
-    setSelectedMatch(null);
-    setViewMode('list');
-    // Atualiza matches após um pequeno delay para garantir que a UI esteja pronta
-    setTimeout(() => {
-      setMatches(filteredMatches.length > 0 ? filteredMatches : allMatchesData);
-    }, 0);
+    // Atualiza matches primeiro
+    const newMatches = filteredMatches.length > 0 ? filteredMatches : allMatchesData;
+    setMatches(newMatches);
+    
+    // Preserva o selectedMatch se ele ainda existir na nova lista
+    // Só reseta se o match selecionado não existir mais ou se não houver match selecionado
+    setSelectedMatch(prevSelected => {
+      if (!prevSelected) {
+        // Se não há match selecionado, mantém null e reseta viewMode
+        setViewMode('list');
+        return null;
+      }
+      
+      // Busca o match atualizado na nova lista
+      const updatedSelectedMatch = newMatches.find(m => m.id === prevSelected.id);
+      
+      if (updatedSelectedMatch) {
+        // Se o match ainda existe, retorna a versão atualizada
+        console.log('✅ Preservando selectedMatch atualizado:', updatedSelectedMatch.id);
+        // Mantém o viewMode atual quando há match selecionado
+        return updatedSelectedMatch;
+      } else {
+        // Se o match não existe mais, reseta para null e volta para a lista
+        console.log('⚠️ Match selecionado não existe mais na lista, resetando');
+        setViewMode('list');
+        return null;
+      }
+    });
   };
 
   const handleLeaguesUpdated = (updatedLeagues: Array<{ leagueName: string; matches: MatchDetails[] }>) => {
