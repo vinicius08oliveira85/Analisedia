@@ -9,7 +9,6 @@ import { GeminiAnalysis } from './GeminiAnalysis';
 import { ProbabilityAnalysisTab } from './ProbabilityAnalysisTab';
 import { SettingsTab } from './SettingsTab';
 import { LeaguesTab } from './LeaguesTab';
-import { scrapeMatchDetailsFromURL, applyMatchDetailsUpdate } from '../services/matchDetailsService';
 import type { MatchDetails, Tab, LiveMatchStatus, MatchOdds } from '../types';
 import type { League } from '../types/league';
 
