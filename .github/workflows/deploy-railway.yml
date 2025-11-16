@@ -26,7 +26,9 @@ jobs:
         run: npm ci
       
       - name: Instalar Railway CLI
-        run: npm install -g @railway/cli@latest
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          echo "$HOME/.railway/bin" >> $GITHUB_PATH
       
       - name: Deploy para Railway
         env:
@@ -45,21 +47,22 @@ jobs:
             echo "   1. Acesse: https://github.com/vinicius08oliveira85/Analisedia/settings/secrets/actions"
             echo "   2. Clique em 'New repository secret'"
             echo "   3. Nome: RAILWAY_TOKEN"
-            echo "   4. Valor: Cole o token do Railway (obtenha em https://railway.app/dashboard)"
+            echo "   4. Valor: Cole o token do Railway (obtenha em https://railway.app/account/tokens)"
             echo "❌ Deploy cancelado - configure o secret primeiro"
             exit 1
           fi
           echo "✅ Token configurado, continuando deploy..."
           
-          # Autentica no Railway usando variável de ambiente
-          # O Railway CLI usa automaticamente a variável RAILWAY_TOKEN se estiver definida
-          echo "🔐 Autenticando no Railway..."
-          export RAILWAY_TOKEN="$RAILWAY_TOKEN"
+          # Configura o token do Railway
+          echo "🔐 Configurando autenticação do Railway..."
+          mkdir -p ~/.railway
+          echo "$RAILWAY_TOKEN" > ~/.railway/token.json
           
           # Verifica se a autenticação funcionou
           railway whoami || {
             echo "❌ Erro: Falha na autenticação com Railway"
             echo "📝 Verifique se o RAILWAY_TOKEN está correto nos secrets do GitHub"
+            echo "📝 Obtenha um novo token em: https://railway.app/account/tokens"
             exit 1
           }
           echo "✅ Autenticado com sucesso no Railway"
@@ -67,7 +70,7 @@ jobs:
           # Linka o projeto ao Railway (se necessário)
           if [ -n "$RAILWAY_PROJECT_ID" ] && [ "$RAILWAY_PROJECT_ID" != "" ]; then
             echo "🔗 Linking projeto: $RAILWAY_PROJECT_ID"
-            railway link $RAILWAY_PROJECT_ID || true
+            railway link $RAILWAY_PROJECT_ID --yes || true
           fi
           
           # Faz o deploy usando o Dockerfile
