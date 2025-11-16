@@ -27,8 +27,78 @@ jobs:
       
       - name: Instalar Railway CLI
         run: |
-          curl -fsSL https://railway.app/install.sh | sh
-          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+          # Tenta instalar via npm primeiro (método mais confiável)
+          echo "📦 Tentando instalar Railway CLI via npm..."
+          npm install -g @railway/cli@latest || {
+            echo "⚠️ Instalação via npm falhou, tentando método alternativo..."
+            
+            # Método alternativo: baixar binário diretamente do GitHub releases
+            echo "📦 Instalando Railway CLI via binário..."
+            
+            # Cria diretório para o Railway CLI
+            mkdir -p $HOME/.railway/bin
+            
+            # Detecta arquitetura
+            ARCH=$(uname -m)
+            case $ARCH in
+              x86_64) ARCH="amd64" ;;
+              aarch64|arm64) ARCH="arm64" ;;
+              *) echo "❌ Arquitetura não suportada: $ARCH"; exit 1 ;;
+            esac
+            
+            # Detecta sistema operacional
+            OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+            
+            # Baixa a versão mais recente do Railway CLI
+            echo "🔍 Buscando versão mais recente do Railway CLI..."
+            VERSION=$(curl -s https://api.github.com/repos/railwayapp/cli/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/v//')
+            
+            if [ -z "$VERSION" ]; then
+              echo "⚠️ Não foi possível obter a versão via API, usando versão fixa..."
+              VERSION="3.15.5"
+            fi
+            
+            echo "📥 Baixando Railway CLI versão $VERSION para $OS/$ARCH..."
+            
+            # URL do binário (formato correto do Railway CLI)
+            BINARY_URL="https://github.com/railwayapp/cli/releases/download/v${VERSION}/railway_${VERSION}_${OS}_${ARCH}.tar.gz"
+            
+            # Baixa e extrai
+            curl -L -f -o railway.tar.gz "$BINARY_URL" || {
+              echo "❌ Erro ao baixar Railway CLI do GitHub"
+              echo "Tentando URL alternativa..."
+              BINARY_URL="https://github.com/railwayapp/cli/releases/latest/download/railway_${OS}_${ARCH}.tar.gz"
+              curl -L -f -o railway.tar.gz "$BINARY_URL" || {
+                echo "❌ Todos os métodos de instalação falharam"
+                exit 1
+              }
+            }
+            
+            tar -xzf railway.tar.gz -C $HOME/.railway/bin railway || {
+              echo "❌ Erro ao extrair Railway CLI"
+              exit 1
+            }
+            
+            rm -f railway.tar.gz
+            
+            # Torna executável
+            chmod +x $HOME/.railway/bin/railway
+            
+            # Adiciona ao PATH
+            echo "$HOME/.railway/bin" >> $GITHUB_PATH
+            
+            # Verifica instalação
+            $HOME/.railway/bin/railway --version || {
+              echo "❌ Railway CLI não está funcionando após instalação"
+              exit 1
+            }
+            
+            echo "✅ Railway CLI instalado via binário: $($HOME/.railway/bin/railway --version)"
+            exit 0
+          }
+          
+          # Se chegou aqui, npm funcionou
+          echo "✅ Railway CLI instalado via npm: $(railway --version)"
       
       - name: Deploy para Railway
         env:
