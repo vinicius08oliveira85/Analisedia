@@ -106,19 +106,17 @@ const App: React.FC = () => {
     console.log('handleSelectMatch chamado com matchId:', matchId);
     console.log('todayMatches:', todayMatches.length, 'matches:', matches.length);
     
-    // Primeiro, limpa a seleção anterior e o viewMode
-    setViewMode('list');
-    
     // Busca primeiro nos jogos filtrados, depois em todos
     const match = todayMatches.find(m => m.id === matchId) || matches.find(m => m.id === matchId);
     
     if (match) {
       console.log('Match encontrado:', match.teamA.name, 'vs', match.teamB.name);
-      setSelectedMatch(match);
+      // Usa uma função para garantir que o estado seja atualizado corretamente
+      setSelectedMatch(() => match);
       // Scroll suave para o topo quando abrir os detalhes
-      requestAnimationFrame(() => {
+      setTimeout(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
+      }, 0);
     } else {
       console.warn('Jogo não encontrado:', matchId);
       console.warn('IDs disponíveis:', todayMatches.map(m => m.id), matches.map(m => m.id));
