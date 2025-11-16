@@ -1862,18 +1862,20 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
   return defaultStats;
 }
 
-// Função para detectar se o HTML é da Academia das Apostas Brasil
-function isAcademiaDasApostasBrasil(html: string): boolean {
+// Função auxiliar para detectar se é Academia das Apostas Brasil
+function isAcademiaDasApostasBrasil(html: string, url?: string): boolean {
+  if (url && url.includes('academiadasapostasbrasil.com')) {
+    return true;
+  }
   return html.includes('academiadasapostasbrasil.com') || 
-         html.includes('academia-das-apostas') ||
+         html.includes('Academia das Apostas Brasil') ||
          html.includes('stats-subtitle') ||
-         html.includes('stat-last10') ||
-         html.includes('stat-seqs');
+         html.includes('stat-last10');
 }
 
 // Função para extrair informações básicas do jogo
 function extractMatchInfo(html: string, url?: string): { teamA: string; teamB: string; date: string; competition: string } | null {
-  const isAcademia = isAcademiaDasApostasBrasil(html);
+  const isAcademia = isAcademiaDasApostasBrasil(html, url);
   
   // Estratégia 1: Procura por JSON-LD (mais confiável)
   const jsonScriptRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gs;
@@ -1923,20 +1925,36 @@ function extractMatchInfo(html: string, url?: string): { teamA: string; teamB: s
 
   // Estratégia 2: Para Academia das Apostas Brasil, procura no título da página
   if (isAcademia) {
-    // Procura no título: "Portugal vs Armênia - Estatísticas e Análise"
+    // Procura no título: "Atlético-MG Fortaleza estatísticas | Brasileirão Série A | 12 novembro 2025"
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (titleMatch) {
       const title = titleMatch[1];
-      // Padrão: "Portugal vs Armênia" ou "Portugal - Armênia"
+      console.log('[extractMatchInfo] Título encontrado:', title);
+      
+      // Padrão 1: "TimeA TimeB estatísticas | Competição | Data"
+      // Exemplo: "Atlético-MG Fortaleza estatísticas | Brasileirão Série A | 12 novembro 2025"
+      const pattern1 = title.match(/^([^-|–|—|vs|VS|estatísticas]+?)\s+([^-|–|—|vs|VS|estatísticas]+?)\s+estatísticas\s*\|\s*([^|]+?)(?:\s*\|\s*([^|]+))?/i);
+      if (pattern1 && pattern1[1] && pattern1[2]) {
+        const teamA = pattern1[1].trim();
+        const teamB = pattern1[2].trim();
+        const competition = pattern1[3] ? pattern1[3].trim() : '';
+        const date = pattern1[4] ? pattern1[4].trim() : '';
+        
+        console.log('[extractMatchInfo] Extraído do título (padrão 1):', { teamA, teamB, competition, date });
+        return { teamA, teamB, date, competition };
+      }
+      
+      // Padrão 2: "TimeA vs TimeB" ou "TimeA - TimeB"
       const vsMatch = title.match(/([^-|–|—|vs|VS]+?)\s*(?:vs|VS|v|V|vs\.|VS\.|-|–|—)\s*([^-|–|—|vs|VS]+?)(?:\s*-|\s*\|)/i);
       if (vsMatch && vsMatch[1] && vsMatch[2]) {
         const teamA = vsMatch[1].trim();
         const teamB = vsMatch[2].trim();
         
         // Extrai competição do título se disponível
-        const competitionMatch = title.match(/-?\s*([^-|–|—]+?)(?:\s*-\s*Estatísticas)/i);
+        const competitionMatch = title.match(/\|\s*([^|]+?)(?:\s*\|)/i);
         const competition = competitionMatch ? competitionMatch[1].trim() : '';
         
+        console.log('[extractMatchInfo] Extraído do título (padrão 2):', { teamA, teamB, competition });
         return {
           teamA,
           teamB,
