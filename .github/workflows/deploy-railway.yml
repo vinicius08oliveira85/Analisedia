@@ -51,9 +51,18 @@ jobs:
           fi
           echo "✅ Token configurado, continuando deploy..."
           
-          # Autentica no Railway
+          # Autentica no Railway usando variável de ambiente
+          # O Railway CLI usa automaticamente a variável RAILWAY_TOKEN se estiver definida
           echo "🔐 Autenticando no Railway..."
-          echo "$RAILWAY_TOKEN" | railway login --token
+          export RAILWAY_TOKEN="$RAILWAY_TOKEN"
+          
+          # Verifica se a autenticação funcionou
+          railway whoami || {
+            echo "❌ Erro: Falha na autenticação com Railway"
+            echo "📝 Verifique se o RAILWAY_TOKEN está correto nos secrets do GitHub"
+            exit 1
+          }
+          echo "✅ Autenticado com sucesso no Railway"
           
           # Linka o projeto ao Railway (se necessário)
           if [ -n "$RAILWAY_PROJECT_ID" ] && [ "$RAILWAY_PROJECT_ID" != "" ]; then
