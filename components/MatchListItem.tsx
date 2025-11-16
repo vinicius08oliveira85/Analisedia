@@ -79,10 +79,17 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, onClick, is
         </div>
         <div className="text-center flex-shrink-0 px-1 sm:px-2">
           {/* Mostra placar se estiver ao vivo, senão mostra horário */}
-          {match.liveStatus?.isLive && match.liveStatus?.homeScore !== undefined && match.liveStatus?.awayScore !== undefined ? (
-            <div className="font-bold text-sm sm:text-base text-white mb-0.5">
-              {match.liveStatus.homeScore} - {match.liveStatus.awayScore}
-            </div>
+          {isLive && match.liveStatus?.homeScore !== undefined && match.liveStatus?.awayScore !== undefined ? (
+            <>
+              <div className="font-bold text-base sm:text-lg text-white mb-0.5 bg-red-600/20 px-2 py-0.5 rounded border border-red-500/50">
+                {match.liveStatus.homeScore} - {match.liveStatus.awayScore}
+              </div>
+              {match.liveStatus.minute !== undefined && (
+                <div className="text-[9px] sm:text-[10px] text-red-400 font-semibold mb-0.5">
+                  {match.liveStatus.minute}'
+                </div>
+              )}
+            </>
           ) : (
             <div className="font-bold text-xs sm:text-sm text-white">{match.matchInfo.time}</div>
           )}
