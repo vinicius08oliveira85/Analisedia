@@ -207,12 +207,33 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
             <p className="text-yellow-200 text-[10px] sm:text-xs mb-2">
               {detailsError}
             </p>
-            <p className="text-yellow-300 text-[9px] sm:text-[10px] mt-1 border-t border-yellow-700/50 pt-1.5">
+            <p className="text-yellow-300 text-[9px] sm:text-[10px] mt-1 border-t border-yellow-700/50 pt-1.5 mb-2">
               💡 <strong>Solução:</strong> Acesse a aba "Configurações" para:
               <br />• Colar o HTML da página manualmente
               <br />• Fazer upload de um arquivo HTML
               <br />• Atualizar os detalhes do jogo
             </p>
+            {(detailsError.includes('403') || detailsError.includes('Acesso negado') || detailsError.includes('bloqueando')) && (
+              <button
+                onClick={() => setActiveTab('Configurações')}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 active:bg-yellow-800 text-white font-semibold py-1.5 px-3 rounded text-[10px] sm:text-xs transition-colors duration-200 flex items-center justify-center gap-1.5 touch-manipulation"
+                style={{ 
+                  WebkitTapHighlightColor: 'transparent',
+                  touchAction: 'manipulation',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  minHeight: '36px',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto'
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Ir para Configurações
+              </button>
+            )}
           </div>
         )}
         <MatchHeader 
