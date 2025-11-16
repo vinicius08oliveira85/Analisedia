@@ -125,6 +125,7 @@ const App: React.FC = () => {
 
   const handleBackToList = () => {
     setSelectedMatch(null);
+    setViewMode('list');
   };
 
   const handleToggleFavorite = (matchId: string) => {
@@ -141,6 +142,15 @@ const App: React.FC = () => {
   const todayMatches = useMemo(() => {
     return filterTodayAndFutureMatches(matches);
   }, [matches]);
+
+  // Debug: Log quando selectedMatch muda
+  useEffect(() => {
+    if (selectedMatch) {
+      console.log('✅ selectedMatch atualizado:', selectedMatch.id, selectedMatch.teamA.name, 'vs', selectedMatch.teamB.name);
+    } else {
+      console.log('✅ selectedMatch limpo (null)');
+    }
+  }, [selectedMatch]);
 
   // Polling automático para jogos ao vivo
   const liveMatches = todayMatches.filter(m => m.liveStatus?.isLive);
