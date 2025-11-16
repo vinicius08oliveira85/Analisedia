@@ -277,14 +277,16 @@ const App: React.FC = () => {
             )}
           </>
         )}
-        {selectedMatch ? (
-          <MatchDetail 
-            match={selectedMatch} 
-            onBack={handleBackToList}
-            isFavorite={favorites.includes(selectedMatch.id)}
-            onToggleFavorite={handleToggleFavorite}
-          />
-        ) : viewMode === 'config' ? (
+        {(() => {
+          console.log('🔍 Renderização condicional - selectedMatch:', selectedMatch ? selectedMatch.id : 'null', 'viewMode:', viewMode);
+          return selectedMatch ? (
+            <MatchDetail 
+              match={selectedMatch} 
+              onBack={handleBackToList}
+              isFavorite={favorites.includes(selectedMatch.id)}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          ) : viewMode === 'config' ? (
           <ConfigTab
             onMatchesUpdated={handleMatchesUpdated}
             onLeaguesUpdated={handleLeaguesUpdated}
