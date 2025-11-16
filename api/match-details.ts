@@ -1862,9 +1862,20 @@ function extractGoalStats(html: string, teamName: string, scope: 'home' | 'away'
   return defaultStats;
 }
 
+// Função para detectar se o HTML é da Academia das Apostas Brasil
+function isAcademiaDasApostasBrasil(html: string): boolean {
+  return html.includes('academiadasapostasbrasil.com') || 
+         html.includes('academia-das-apostas') ||
+         html.includes('stats-subtitle') ||
+         html.includes('stat-last10') ||
+         html.includes('stat-seqs');
+}
+
 // Função para extrair informações básicas do jogo
-function extractMatchInfo(html: string): { teamA: string; teamB: string; date: string; competition: string } | null {
-  // Estratégia 1: Procura por JSON-LD
+function extractMatchInfo(html: string, url?: string): { teamA: string; teamB: string; date: string; competition: string } | null {
+  const isAcademia = isAcademiaDasApostasBrasil(html);
+  
+  // Estratégia 1: Procura por JSON-LD (mais confiável)
   const jsonScriptRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gs;
   const scripts = html.match(jsonScriptRegex);
   
@@ -1878,12 +1889,12 @@ function extractMatchInfo(html: string): { teamA: string; teamB: string; date: s
             const teamA = data.homeTeam?.name || '';
             const teamB = data.awayTeam?.name || '';
             if (teamA && teamB) {
-            return {
+              return {
                 teamA,
                 teamB,
-              date: data.startDate || '',
-              competition: data.location?.name?.split(' - ')[1] || data.location?.name || ''
-            };
+                date: data.startDate || '',
+                competition: data.location?.name?.split(' - ')[1] || data.location?.name || data.sport?.name || ''
+              };
             }
           }
           // Também verifica @graph
@@ -1897,7 +1908,7 @@ function extractMatchInfo(html: string): { teamA: string; teamB: string; date: s
                     teamA,
                     teamB,
                     date: item.startDate || '',
-                    competition: item.location?.name?.split(' - ')[1] || item.location?.name || ''
+                    competition: item.location?.name?.split(' - ')[1] || item.location?.name || item.sport?.name || ''
                   };
                 }
               }
@@ -1910,12 +1921,55 @@ function extractMatchInfo(html: string): { teamA: string; teamB: string; date: s
     }
   }
 
-  // Estratégia 2: Procura por títulos ou headings com nomes dos times
-  // Padrão comum: "França vs Ucrânia" ou "França - Ucrânia"
+  // Estratégia 2: Para Academia das Apostas Brasil, procura no título da página
+  if (isAcademia) {
+    // Procura no título: "Portugal vs Armênia - Estatísticas e Análise"
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) {
+      const title = titleMatch[1];
+      // Padrão: "Portugal vs Armênia" ou "Portugal - Armênia"
+      const vsMatch = title.match(/([^-|–|—|vs|VS]+?)\s*(?:vs|VS|v|V|vs\.|VS\.|-|–|—)\s*([^-|–|—|vs|VS]+?)(?:\s*-|\s*\|)/i);
+      if (vsMatch && vsMatch[1] && vsMatch[2]) {
+        const teamA = vsMatch[1].trim();
+        const teamB = vsMatch[2].trim();
+        
+        // Extrai competição do título se disponível
+        const competitionMatch = title.match(/-?\s*([^-|–|—]+?)(?:\s*-\s*Estatísticas)/i);
+        const competition = competitionMatch ? competitionMatch[1].trim() : '';
+        
+        return {
+          teamA,
+          teamB,
+          date: '',
+          competition
+        };
+      }
+    }
+    
+    // Procura em headings específicos da Academia
+    const headingPatterns = [
+      /<h[1-3][^>]*class="[^"]*match-title[^"]*"[^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-|–|—)\s+([^<]+)<\/h[1-3]>/i,
+      /<div[^>]*class="[^"]*match-header[^"]*"[^>]*>[\s\S]*?<h[1-3][^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-|–|—)\s+([^<]+)<\/h[1-3]>/i,
+    ];
+    
+    for (const pattern of headingPatterns) {
+      const match = html.match(pattern);
+      if (match && match[1] && match[2]) {
+        return {
+          teamA: match[1].trim(),
+          teamB: match[2].trim(),
+          date: '',
+          competition: ''
+        };
+      }
+    }
+  }
+
+  // Estratégia 3: Procura por títulos ou headings com nomes dos times (genérico)
   const titlePatterns = [
-    /<h[1-3][^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-)\s+([^<]+)<\/h[1-3]>/i,
-    /<title[^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-)\s+([^<]+)<\/title>/i,
-    /class="[^"]*match-title[^"]*"[^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-)\s+([^<]+)</i,
+    /<h[1-3][^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-|–|—)\s+([^<]+)<\/h[1-3]>/i,
+    /<title[^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-|–|—)\s+([^<]+)<\/title>/i,
+    /class="[^"]*match-title[^"]*"[^>]*>([^<]+)\s+(?:vs|VS|v|V|vs\.|VS\.|-|–|—)\s+([^<]+)</i,
   ];
 
   for (const pattern of titlePatterns) {
@@ -1930,13 +1984,13 @@ function extractMatchInfo(html: string): { teamA: string; teamB: string; date: s
     }
   }
 
-  // Estratégia 3: Procura por tabelas de form e extrai nomes dos times de lá
+  // Estratégia 4: Procura por tabelas de form e extrai nomes dos times de lá
   const formTableRegex = /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>/gi;
   const teamNames: string[] = [];
   let formMatch;
   while ((formMatch = formTableRegex.exec(html)) !== null && teamNames.length < 2) {
     const teamName = formMatch[1].trim();
-    if (teamName && !teamNames.includes(teamName)) {
+    if (teamName && !teamNames.includes(teamName) && teamName.length > 2) {
       teamNames.push(teamName);
     }
   }
@@ -1950,18 +2004,24 @@ function extractMatchInfo(html: string): { teamA: string; teamB: string; date: s
     };
   }
 
-  // Estratégia 4: Procura na URL (último recurso)
-  // Exemplo: /franca/ucrania/ -> França vs Ucrânia
-  const urlMatch = html.match(/\/stats\/match\/[^\/]+\/[^\/]+\/([^\/]+)\/([^\/]+)\//);
+  // Estratégia 5: Procura na URL (último recurso)
+  // Exemplo: /stats/match/europa/eliminatorias-para-a-copa-do-mundo-europa/portugal/armenia/PvoQo35DwQlOy
+  const urlPattern = /\/stats\/match\/[^\/]+\/[^\/]+\/([^\/]+)\/([^\/]+)\//;
+  const urlMatch = url ? url.match(urlPattern) : html.match(urlPattern);
   if (urlMatch && urlMatch[1] && urlMatch[2]) {
     // Converte slug para nome (capitaliza primeira letra)
     const teamA = urlMatch[1].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     const teamB = urlMatch[2].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    
+    // Tenta extrair competição da URL
+    const competitionMatch = url ? url.match(/\/stats\/match\/[^\/]+\/([^\/]+)\//) : null;
+    const competition = competitionMatch ? competitionMatch[1].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
+    
     return {
       teamA,
       teamB,
       date: '',
-      competition: ''
+      competition
     };
   }
 
@@ -1984,18 +2044,18 @@ export default async function handler(
 
   if (req.method === 'POST') {
     try {
-      const { html, matchId, competitionUrl } = req.body;
+      const { html, matchId, competitionUrl, url } = req.body;
 
-      console.log(`[match-details handler] Recebido: matchId="${matchId}", competitionUrl="${competitionUrl || 'não fornecida'}"`);
+      console.log(`[match-details handler] Recebido: matchId="${matchId}", competitionUrl="${competitionUrl || 'não fornecida'}", url="${url || 'não fornecida'}"`);
 
       if (!html || typeof html !== 'string') {
         return res.status(400).json({ 
-          error: 'É necessário fornecer o HTML no body: { "html": "...", "matchId": "...", "competitionUrl": "..." (opcional) }' 
+          error: 'É necessário fornecer o HTML no body: { "html": "...", "matchId": "...", "url": "..." (opcional), "competitionUrl": "..." (opcional) }' 
         });
       }
 
-      // Extrai informações básicas
-      const matchInfo = extractMatchInfo(html);
+      // Extrai informações básicas (passa a URL se disponível para melhor detecção)
+      const matchInfo = extractMatchInfo(html, url || competitionUrl);
       if (!matchInfo || !matchInfo.teamA || !matchInfo.teamB) {
         // Tenta usar os nomes do matchId se disponível
         const matchIdParts = (matchId || '').split('-');

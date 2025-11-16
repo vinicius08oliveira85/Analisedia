@@ -71,7 +71,19 @@ export const UpdateMatchDetails: React.FC<UpdateMatchDetailsProps> = ({ match, o
       setIsUpdating(true);
       setMessage(null);
 
-      const result: MatchDetailsResponse = await updateMatchDetailsFromHTML(html, match.id);
+      // Tenta extrair URL do HTML ou usa a URL do campo se disponível
+      let urlToUse = url.trim() || '';
+      if (!urlToUse) {
+        // Tenta extrair URL do HTML (pode estar em meta tags ou links)
+        const urlMatch = html.match(/<meta[^>]*property=["']og:url["'][^>]*content=["']([^"']+)["']/i) ||
+                         html.match(/<link[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["']/i) ||
+                         html.match(/https?:\/\/[^\s"']+academiadasapostasbrasil\.com[^\s"']+/i);
+        if (urlMatch) {
+          urlToUse = urlMatch[1] || urlMatch[0];
+        }
+      }
+
+      const result: MatchDetailsResponse = await updateMatchDetailsFromHTML(html, match.id, urlToUse || undefined);
       console.log('Resposta da API:', result);
       
       // Verifica se há dados extraídos

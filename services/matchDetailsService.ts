@@ -19,10 +19,14 @@ export interface MatchDetailsResponse {
 
 /**
  * Atualiza os detalhes de uma partida enviando o HTML para a API processar
+ * @param html - HTML da página de detalhes
+ * @param matchId - ID do jogo
+ * @param url - URL opcional da página (melhora a detecção de times e competição)
  */
 export async function updateMatchDetailsFromHTML(
   html: string, 
-  matchId: string
+  matchId: string,
+  url?: string
 ): Promise<MatchDetailsResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/match-details`, {
@@ -30,7 +34,7 @@ export async function updateMatchDetailsFromHTML(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ html, matchId }),
+      body: JSON.stringify({ html, matchId, url }),
     });
 
     if (!response.ok) {
@@ -113,6 +117,7 @@ export async function scrapeMatchDetailsFromURL(
         body: JSON.stringify({ 
           html: scrapeData.html, 
           matchId,
+          url: url, // Passa a URL original para melhor detecção
           competitionUrl: competitionUrl || undefined
         }),
       });
