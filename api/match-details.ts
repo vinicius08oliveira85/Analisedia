@@ -1435,6 +1435,87 @@ function extractGoalStatsDirectly(html: string, teamName: string, scope: 'home' 
   return defaultStats;
 }
 
+// Função para extrair momentos dos gols das tabelas stat-goals
+function extractGoalMoments(html: string, teamName: string, sectionHtml?: string): { scored: number[]; conceded: number[] } {
+  const defaultMoments = {
+    scored: [0, 0, 0, 0, 0, 0], // 0-15, 16-30, 31-45, 46-60, 61-75, 76-90
+    conceded: [0, 0, 0, 0, 0, 0]
+  };
+  
+  const searchHtml = sectionHtml || html;
+  const actualTeamName = findTeamNameInHTML(html, teamName) || teamName;
+  const escapedName = actualTeamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
+  console.log(`[extractGoalMoments] Buscando momentos dos gols para: ${teamName} (encontrado: ${actualTeamName})`);
+  
+  // Busca tabelas stat-goals próximas ao nome do time na seção "Gols"
+  const goalMomentsPattern = new RegExp(`${escapedName}[\\s\\S]{0,2000}<table[^>]*class="[^"]*stat-goals[^"]*"[^>]*>([\\s\\S]*?)<\\/table>`, 'i');
+  const goalMomentsMatch = searchHtml.match(goalMomentsPattern);
+  
+  if (!goalMomentsMatch) {
+    console.log(`[extractGoalMoments] Tabela stat-goals não encontrada para ${teamName}`);
+    return defaultMoments;
+  }
+  
+  const tableHtml = goalMomentsMatch[1];
+  const moments = { ...defaultMoments };
+  
+  // Intervalos: 0-15, 16-30, 31-45, 46-60, 61-75, 76-90
+  const intervals = [
+    { pattern: /0-15|0\s*-\s*15/i, index: 0 },
+    { pattern: /16-30|16\s*-\s*30/i, index: 1 },
+    { pattern: /31-45|31\s*-\s*45/i, index: 2 },
+    { pattern: /46-60|46\s*-\s*60/i, index: 3 },
+    { pattern: /61-75|61\s*-\s*75/i, index: 4 },
+    { pattern: /76-90|76\s*-\s*90/i, index: 5 }
+  ];
+  
+  // Extrai linhas da tabela
+  const rowRegex = /<tr[^>]*class="[^"]*(even|odd)[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  const rows = tableHtml.match(rowRegex) || [];
+  
+  for (const interval of intervals) {
+    // Busca a linha que contém o intervalo
+    const intervalRow = rows.find(row => interval.pattern.test(row));
+    if (!intervalRow) continue;
+    
+    // Extrai células da linha
+    const cells: string[] = [];
+    const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(intervalRow)) !== null) {
+      const cellText = cleanHTMLText(cellMatch[1]);
+      cells.push(cellText);
+    }
+    
+    // Procura por "G.Marc" (gols marcados) e "G.Sofr" (gols sofridos)
+    // A estrutura é: intervalo, tipo (G.Marc/G.Sofr), número
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i].toLowerCase().trim();
+      if (cell.includes('g.marc') || cell.includes('gols marcados')) {
+        // Próxima célula deve ter o número
+        const nextCell = cells[i + 1] || '';
+        const numValue = parseIntegerValue(nextCell);
+        if (numValue > 0) {
+          moments.scored[interval.index] = numValue;
+          console.log(`[extractGoalMoments] ${interval.pattern.source}: Marcados = ${numValue}`);
+        }
+      } else if (cell.includes('g.sofr') || cell.includes('gols sofridos')) {
+        // Próxima célula deve ter o número
+        const nextCell = cells[i + 1] || '';
+        const numValue = parseIntegerValue(nextCell);
+        if (numValue > 0) {
+          moments.conceded[interval.index] = numValue;
+          console.log(`[extractGoalMoments] ${interval.pattern.source}: Sofridos = ${numValue}`);
+        }
+      }
+    }
+  }
+  
+  console.log(`[extractGoalMoments] Resultado para ${teamName}: Marcados=[${moments.scored.join(',')}], Sofridos=[${moments.conceded.join(',')}]`);
+  return moments;
+}
+
 // Função auxiliar para extrair goal stats de uma tabela HTML específica
 function extractGoalStatsFromTable(tableHtml: string, scope: 'home' | 'away' | 'global'): TeamGoalStats {
   const defaultStats: TeamGoalStats = {
@@ -1476,19 +1557,26 @@ function extractGoalStatsFromTable(tableHtml: string, scope: 'home' | 'away' | '
       continue;
     }
     
-    // Extrai células da linha
-    const cells: string[] = [];
+    // Extrai células da linha COM suas classes para identificar highlight-home/highlight-away
+    const cells: Array<{ text: string; hasHighlightHome: boolean; hasHighlightAway: boolean; index: number }> = [];
     const cellPatterns = [
+      /<t[dh][^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/t[dh]>/gi,
       /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi,
-      /<td[^>]*>([\s\S]*?)<\/td>/gi,
     ];
     
+    let cellIndex = 0;
     for (const cellRegex of cellPatterns) {
       let cellMatch;
       while ((cellMatch = cellRegex.exec(row)) !== null) {
-        const cellText = cleanHTMLText(cellMatch[1]);
-        if (cellText.trim()) {
-          cells.push(cellText);
+        const cellClasses = cellMatch[1] || '';
+        const cellText = cleanHTMLText(cellMatch[2] || cellMatch[1] || '');
+        if (cellText.trim() || cellIndex === 0) { // Primeira célula pode ser vazia (label)
+          cells.push({
+            text: cellText,
+            hasHighlightHome: /highlight-home/i.test(cellClasses),
+            hasHighlightAway: /highlight-away/i.test(cellClasses),
+            index: cellIndex++
+          });
         }
       }
       if (cells.length > 0) break;
@@ -1499,19 +1587,49 @@ function extractGoalStatsFromTable(tableHtml: string, scope: 'home' | 'away' | '
     }
     
     // Primeira célula é o label
-    const label = cells[0].toLowerCase().trim();
+    const label = cells[0].text.toLowerCase().trim();
     
     // Determina qual coluna usar baseado no escopo
-    let colIndex: number;
-    if (cells.length >= 4) {
-      colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 3;
-    } else if (cells.length === 3) {
-      colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 1;
-    } else {
+    let colIndex: number = -1;
+    
+    // ESTRATÉGIA 1: Busca por classes highlight-home/highlight-away
+    if (scope === 'home') {
+      const homeCell = cells.find(c => c.hasHighlightHome);
+      if (homeCell) {
+        colIndex = homeCell.index;
+      }
+    } else if (scope === 'away') {
+      const awayCell = cells.find(c => c.hasHighlightAway);
+      if (awayCell) {
+        colIndex = awayCell.index;
+      }
+    } else if (scope === 'global') {
+      // Para global, procura a última coluna que não tem highlight
+      const globalCell = cells.slice().reverse().find(c => !c.hasHighlightHome && !c.hasHighlightAway && c.index > 0);
+      if (globalCell) {
+        colIndex = globalCell.index;
+      }
+    }
+    
+    // ESTRATÉGIA 2: Se não encontrou highlight, usa posição padrão
+    if (colIndex === -1) {
+      if (cells.length >= 4) {
+        // Estrutura: Label | Casa | Fora | Global
+        colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 3;
+      } else if (cells.length === 3) {
+        // Estrutura: Label | Casa | Fora (ou Label | Fora | Global)
+        colIndex = scope === 'home' ? 1 : scope === 'away' ? 2 : 1;
+      } else {
+        continue;
+      }
+    }
+    
+    // Garante que o índice está dentro dos limites
+    if (colIndex < 0 || colIndex >= cells.length) {
       continue;
     }
     
-    const value = (cells[colIndex] || '').trim();
+    const value = (cells[colIndex]?.text || '').trim();
     
     // Extrai valores numéricos usando os parsers robustos
     if (label.includes('média de gols marcados') || label.includes('média gols marcados') || (label.includes('média') && label.includes('marcados'))) {
@@ -2230,9 +2348,12 @@ export default async function handler(
       console.log(`[Goal Stats] Time A: "${matchInfo.teamA}" -> "${teamAActualName}" (normalizado: "${teamAActualNormalized}")`);
       console.log(`[Goal Stats] Time B: "${matchInfo.teamB}" -> "${teamBActualName}" (normalizado: "${teamBActualNormalized}")`);
       
-      // Busca todas as tabelas de goal stats
+      // Busca especificamente a seção "Gols" (não confundir com "Percurso" que tem streaks)
       let sectionHtml = '';
       const sectionPatterns = [
+        // Padrão específico: <h3>Gols</h3> seguido de tabelas stat-seqs com dados de gols
+        /<h3[^>]*>Gols<\/h3>[\s\S]*?<tbody[^>]*class="[^"]*ajax-container[^"]*"[^>]*>([\s\S]*?)<\/tbody>/i,
+        /<h3[^>]*>Gols<\/h3>[\s\S]*?(?:Confronto Direto|Classificação|Análise|Resultado|$)/i,
         /(?:ÚLTIMOS 10 JOGOS|GOLS|Análise de Gols)[\s\S]*?(?:Confronto Direto|Classificação|Análise|$)/i,
         /GOLS[\s\S]*?(?:Confronto Direto|Classificação|Análise|$)/i,
         /Análise de Gols[\s\S]*?(?:Confronto Direto|Classificação|Análise|$)/i,
@@ -2241,12 +2362,14 @@ export default async function handler(
       for (const pattern of sectionPatterns) {
         const sectionMatch = html.match(pattern);
         if (sectionMatch) {
-          sectionHtml = sectionMatch[0];
+          sectionHtml = sectionMatch[1] || sectionMatch[0];
+          console.log(`[Goal Stats] Seção "Gols" encontrada com padrão (${sectionHtml.length} chars)`);
           break;
         }
       }
       
       if (!sectionHtml) {
+        console.log(`[Goal Stats] Seção "Gols" não encontrada, buscando em todo o HTML`);
         sectionHtml = html;
       }
       
@@ -2254,8 +2377,11 @@ export default async function handler(
       const allGoalStatsTables: Array<{ teamName: string; tableHtml: string; index: number }> = [];
       let tableIndex = 0;
       
-      // ESTRATÉGIA 1: Busca com stats-subtitle (padrão)
+      // ESTRATÉGIA 1: Busca especificamente tabelas stat-seqs na seção "Gols" (não confundir com "Percurso")
+      // Procura por: <span class="stats-subtitle">Time</span> seguido de <table class="stat-seqs"> com dados de gols
       const tablePatterns = [
+        // Padrão específico: stats-subtitle seguido de stat-seqs com "Média de gols"
+        /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*stat-seqs[^"]*"[^>]*>([\s\S]*?)<\/table>/gi,
         /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*class="[^"]*(?:stat-last10|stat-seqs)[^"]*"[^>]*>([\s\S]*?)<\/table>/gi,
         /<span[^>]*class="[^"]*stats-subtitle[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<table[^>]*>([\s\S]*?)<\/table>/gi,
       ];
@@ -2266,20 +2392,25 @@ export default async function handler(
           const foundTeamName = match[1].trim();
           const tableHtml = match[2];
           
+          // Verifica se é uma tabela de goal stats (não de streaks)
+          // Tabelas de goal stats têm "Média de gols marcados" ou "Média de gols sofridos"
+          // Tabelas de streaks têm "Sequência de Vitórias" ou "Não perde há"
           const isGoalStatsTable = 
-            tableHtml.includes('Média de gols') || 
-            tableHtml.includes('> 2,5') || 
-            tableHtml.includes('< 2,5') || 
-            tableHtml.includes('Jogos sem') ||
-            tableHtml.includes('Média de gols marcados') ||
-            tableHtml.includes('Média de gols sofridos') ||
-            (tableHtml.includes('média') && (tableHtml.includes('gols') || tableHtml.includes('gol')));
+            (tableHtml.includes('Média de gols marcados') || 
+             tableHtml.includes('Média de gols sofridos') ||
+             tableHtml.includes('Média de gols marcados+sofridos') ||
+             tableHtml.includes('Média de gols marcados por jogo') ||
+             tableHtml.includes('Média de gols sofridos por jogo')) &&
+            !tableHtml.includes('Sequência de Vitórias') &&
+            !tableHtml.includes('Não perde há') &&
+            !tableHtml.includes('Não ganha há') &&
+            !tableHtml.includes('Não empata há');
           
           if (isGoalStatsTable) {
             const exists = allGoalStatsTables.some(t => t.teamName === foundTeamName && t.tableHtml === tableHtml);
             if (!exists) {
               allGoalStatsTables.push({ teamName: foundTeamName, tableHtml, index: tableIndex++ });
-              console.log(`[Goal Stats] ESTRATÉGIA 1: Tabela ${tableIndex} encontrada: "${foundTeamName}"`);
+              console.log(`[Goal Stats] ESTRATÉGIA 1: Tabela de goal stats ${tableIndex} encontrada: "${foundTeamName}"`);
             }
           }
         }
@@ -2496,26 +2627,56 @@ export default async function handler(
         }
       }
       
-      // ESTRATÉGIA 2: Se busca direta falhou, tenta tabelas
-      if ((teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0) || 
-          (teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0)) {
-        console.log(`[Goal Stats] ESTRATÉGIA 2: Busca direta falhou parcialmente, tentando tabelas...`);
+      // ESTRATÉGIA 2: Extrai dados das tabelas encontradas (se houver)
+      if (teamATable || teamBTable) {
+        console.log(`[Goal Stats] ESTRATÉGIA 2: Extraindo dados das tabelas encontradas...`);
         
-        if (teamATable && teamAGoalStatsHome.avgGoalsScored === 0 && teamAGoalStatsHome.avgGoalsConceded === 0) {
-          const tableStats = extractGoalStatsFromTable(teamATable.tableHtml, 'home');
-          if (tableStats.avgGoalsScored > 0 || tableStats.avgGoalsConceded > 0) {
-            teamAGoalStatsHome = tableStats;
-            console.log(`[Goal Stats] Time A: Usando dados da tabela!`);
+        if (teamATable) {
+          // Extrai para todos os escopos (home, away, global)
+          const homeStats = extractGoalStatsFromTable(teamATable.tableHtml, 'home');
+          const awayStats = extractGoalStatsFromTable(teamATable.tableHtml, 'away');
+          const globalStats = extractGoalStatsFromTable(teamATable.tableHtml, 'global');
+          
+          if (homeStats.avgGoalsScored > 0 || homeStats.avgGoalsConceded > 0) {
+            teamAGoalStatsHome = homeStats;
+            teamAGoalStatsAway = awayStats;
+            teamAGoalStatsGlobal = globalStats;
+            console.log(`[Goal Stats] Time A: Dados extraídos da tabela! Home: ${homeStats.avgGoalsScored}/${homeStats.avgGoalsConceded}, Away: ${awayStats.avgGoalsScored}/${awayStats.avgGoalsConceded}, Global: ${globalStats.avgGoalsScored}/${globalStats.avgGoalsConceded}`);
           }
         }
         
-        if (teamBTable && teamBGoalStatsHome.avgGoalsScored === 0 && teamBGoalStatsHome.avgGoalsConceded === 0) {
-          const tableStats = extractGoalStatsFromTable(teamBTable.tableHtml, 'home');
-          if (tableStats.avgGoalsScored > 0 || tableStats.avgGoalsConceded > 0) {
-            teamBGoalStatsHome = tableStats;
-            console.log(`[Goal Stats] Time B: Usando dados da tabela!`);
+        if (teamBTable) {
+          // Extrai para todos os escopos (home, away, global)
+          const homeStats = extractGoalStatsFromTable(teamBTable.tableHtml, 'home');
+          const awayStats = extractGoalStatsFromTable(teamBTable.tableHtml, 'away');
+          const globalStats = extractGoalStatsFromTable(teamBTable.tableHtml, 'global');
+          
+          if (homeStats.avgGoalsScored > 0 || homeStats.avgGoalsConceded > 0) {
+            teamBGoalStatsHome = homeStats;
+            teamBGoalStatsAway = awayStats;
+            teamBGoalStatsGlobal = globalStats;
+            console.log(`[Goal Stats] Time B: Dados extraídos da tabela! Home: ${homeStats.avgGoalsScored}/${homeStats.avgGoalsConceded}, Away: ${awayStats.avgGoalsScored}/${awayStats.avgGoalsConceded}, Global: ${globalStats.avgGoalsScored}/${globalStats.avgGoalsConceded}`);
           }
         }
+      }
+      
+      // ESTRATÉGIA 2.5: Extrai momentos dos gols das tabelas stat-goals
+      console.log(`[Goal Stats] ESTRATÉGIA 2.5: Extraindo momentos dos gols...`);
+      const goalMomentsA = extractGoalMoments(html, matchInfo.teamA, sectionHtml);
+      const goalMomentsB = extractGoalMoments(html, matchInfo.teamB, sectionHtml);
+      
+      if (goalMomentsA.scored.some(v => v > 0) || goalMomentsA.conceded.some(v => v > 0)) {
+        teamAGoalStatsHome.goalMoments = goalMomentsA;
+        teamAGoalStatsAway.goalMoments = goalMomentsA;
+        teamAGoalStatsGlobal.goalMoments = goalMomentsA;
+        console.log(`[Goal Stats] Time A: Momentos dos gols extraídos!`);
+      }
+      
+      if (goalMomentsB.scored.some(v => v > 0) || goalMomentsB.conceded.some(v => v > 0)) {
+        teamBGoalStatsHome.goalMoments = goalMomentsB;
+        teamBGoalStatsAway.goalMoments = goalMomentsB;
+        teamBGoalStatsGlobal.goalMoments = goalMomentsB;
+        console.log(`[Goal Stats] Time B: Momentos dos gols extraídos!`);
       }
       
       // ESTRATÉGIA 3: Se ainda não encontrou, tenta extrair dos últimos 10 jogos (calcular média)
