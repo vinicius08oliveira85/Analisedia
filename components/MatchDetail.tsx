@@ -23,6 +23,13 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, onBack, isFavor
   const [currentMatch, setCurrentMatch] = useState<MatchDetails>(match);
   const [activeTab, setActiveTab] = useState<Tab>('Visão Geral');
 
+  // Atualiza currentMatch quando o match prop muda
+  useEffect(() => {
+    setCurrentMatch(match);
+    setActiveTab('Visão Geral'); // Reseta para a primeira aba quando muda de match
+    console.log('✅ MatchDetail atualizado para:', match.id, match.teamA.name, 'vs', match.teamB.name);
+  }, [match.id]);
+
   const handleDetailsUpdated = (updatedMatch: MatchDetails) => {
     setCurrentMatch(updatedMatch);
   };
